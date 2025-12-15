@@ -18,39 +18,49 @@ async create(dto: CreatePropertyDto) {
 
   const slug = slugify(title, { lower: true, strict: true, locale: 'fr' });
 
-  return this.prisma.property.create({
-    data: {
-      ...data,
-      title,
-      slug,
-      city: cityId ? { connect: { id: cityId } } : undefined,
-      district: districtId ? { connect: { id: districtId } } : undefined,
+    // Gérer collision de slug en ajoutant un suffixe incrémental
+    let finalSlug = slug;
+    let suffix = 1;
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const exists = await this.prisma.property.findUnique({ where: { slug: finalSlug }, select: { id: true } });
+      if (!exists) break;
+      finalSlug = `${slug}-${suffix++}`;
+    }
 
-      features: features?.length
-        ? { create: features.map((featureId) => ({ feature: { connect: { id: featureId } } })) }
-        : undefined,
+    return this.prisma.property.create({
+      data: {
+        ...data,
+        title,
+        slug: finalSlug,
+        city: cityId ? { connect: { id: cityId } } : undefined,
+        district: districtId ? { connect: { id: districtId } } : undefined,
 
-      images: images?.length
-        ? { create: images.map((url) => ({ url })) }
-        : undefined,
+        features: features?.length
+          ? { create: features.map((featureId) => ({ feature: { connect: { id: featureId } } })) }
+          : undefined,
 
-      visits3D: assets3D?.length
-        ? { create: assets3D.map((asset) => ({
-            provider: asset.provider,
-            assetUrl: asset.assetUrl,
-            title: asset.title,
-            thumbnail: asset.thumbnail
-          })) }
-        : undefined,
-    },
-    include: {
-      city: true,
-      district: true,
-      features: { include: { feature: true } },
-      images: true,
-      visits3D: true,
-    },
-  });
+        images: images?.length
+          ? { create: images.map((url) => ({ url })) }
+          : undefined,
+
+        visits3D: assets3D?.length
+          ? { create: assets3D.map((asset) => ({
+              provider: asset.provider,
+              assetUrl: asset.assetUrl,
+              title: asset.title,
+              thumbnail: asset.thumbnail
+            })) }
+          : undefined,
+      },
+      include: {
+        city: true,
+        district: true,
+        features: { include: { feature: true } },
+        images: true,
+        visits3D: true,
+      },
+    });
 }
 
 async findAll(filters: PropertyFilterDto) {
@@ -159,8 +169,19 @@ async update(id: number, dto: UpdatePropertyDto) {
   
   async remove(id: number) {
     try {
-      return await this.prisma.property.delete({
-        where: { id },
+      return await this.prisma.$transaction(async (tx) => {
+        // Supprimer les dépendances pour éviter les contraintes FK
+        await tx.propertyImage.deleteMany({ where: { propertyId: id } });
+        await tx.propertyFeature.deleteMany({ where: { propertyId: id } });
+        await tx.favorite.deleteMany({ where: { propertyId: id } });
+        await tx.appointment.deleteMany({ where: { propertyId: id } });
+        await tx.asset3D.deleteMany({ where: { propertyId: id } });
+        await tx.propertyStat.deleteMany({ where: { propertyId: id } });
+        await tx.message.deleteMany({ where: { propertyId: id } });
+
+        return tx.property.delete({
+          where: { id },
+        });
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
