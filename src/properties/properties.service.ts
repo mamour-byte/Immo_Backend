@@ -5,7 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { UpdatePropertyDto } from './dto/update-property.dto';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { PropertyFilterDto } from './dto/property-filter.dto';
-import { ListingPurpose, Prisma, PropertyStatus, PropertyType } from '@prisma/client';
+import {  Prisma } from '@prisma/client';
 import slugify from 'slugify';
 
 @Injectable()
@@ -35,6 +35,7 @@ async create(dto: CreatePropertyDto) {
         slug: finalSlug,
         city: cityId ? { connect: { id: cityId } } : undefined,
         district: districtId ? { connect: { id: districtId } } : undefined,
+        toilets: dto.toilets !== undefined ? Number(dto.toilets) : undefined,
 
         features: features?.length
           ? { create: features.map((featureId) => ({ feature: { connect: { id: featureId } } })) }
@@ -129,6 +130,9 @@ async update(id: number, dto: UpdatePropertyDto) {
   const { images, features, assets3D, ...data } = dto;
 
   const updateData: any = { ...data };
+  if (dto.toilets !== undefined) {
+    updateData.toilets = Number(dto.toilets);
+  }
 
   if (features !== undefined) {
     updateData.features = {
@@ -164,6 +168,87 @@ async update(id: number, dto: UpdatePropertyDto) {
 }
 
   // -------------------------------------------------------------------
+
+  // --- CREATE WITH IMAGES (Transaction) ---
+  async createWithImages(
+    dto: CreatePropertyDto,
+    files: Express.Multer.File[],
+  ) {
+    const { cityId, districtId, features, assets3D, title, images, ...data } = dto;
+
+    const slug = slugify(title, { lower: true, strict: true, locale: 'fr' });
+
+    // Gérer collision de slug en ajoutant un suffixe incrémental
+    let finalSlug = slug;
+    let suffix = 1;
+    while (true) {
+      const exists = await this.prisma.property.findUnique({ where: { slug: finalSlug }, select: { id: true } });
+      if (!exists) break;
+      finalSlug = `${slug}-${suffix++}`;
+    }
+
+    // Créer la propriété ET les images en une transaction
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Créer la propriété
+      const property = await tx.property.create({
+        data: {
+          ...data,
+          title,
+          slug: finalSlug,
+          city: cityId ? { connect: { id: cityId } } : undefined,
+          district: districtId ? { connect: { id: districtId } } : undefined,
+          features: features?.length
+            ? { create: features.map((featureId) => ({ feature: { connect: { id: featureId } } })) }
+            : undefined,
+          visits3D: assets3D?.length
+            ? { create: assets3D.map((asset) => ({
+                provider: asset.provider,
+                assetUrl: asset.assetUrl,
+                title: asset.title,
+                thumbnail: asset.thumbnail
+              })) }
+            : undefined,
+        },
+        include: {
+          city: true,
+          district: true,
+          features: { include: { feature: true } },
+          images: true,
+          visits3D: true,
+        },
+      });
+
+      // 2. Uploader les images si présentes
+      if (files && files.length > 0) {
+        await Promise.all(
+          files.map((file, index) =>
+            tx.propertyImage.create({
+              data: {
+                url: (file as any).path ?? (file as any).secure_url ?? file.filename,
+                propertyId: property.id,
+                order: index,
+                provider: 'cloudinary',
+              },
+            }),
+          ),
+        );
+        // Récupérer les images mises à jour
+        const updatedProperty = await tx.property.findUnique({
+          where: { id: property.id },
+          include: {
+            city: true,
+            district: true,
+            features: { include: { feature: true } },
+            images: true,
+            visits3D: true,
+          },
+        });
+        return updatedProperty;
+      }
+
+      return property;
+    });
+  }
 
   // --- REMOVE ---
   

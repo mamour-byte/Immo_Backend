@@ -1,0 +1,241 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/**
+ * * ENUMS **
+ */
+enum Role {
+  USER
+  AGENT
+  ADMIN
+}
+
+enum PropertyType {
+  APPARTMENT
+  STUDIO
+  MAISON
+  TERRAIN
+  BUREAU
+  LOCAL_COMMERCE
+  AUTRE
+}
+
+enum ListingPurpose {
+  VENTE
+  LOCATION
+}
+
+enum PropertyStatus {
+  AVAILABLE
+  UNDER_OFFER
+  SOLD
+  RENTED
+  ARCHIVED
+}
+
+enum Furnishing {
+  FURNISHED
+  PART_FURNISHED
+  UNFURNISHED
+}
+
+/**
+ * * MODELS **
+ */
+
+model User {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  passwordHash String
+  fullName     String?
+  phone        String?
+  role         Role     @default(USER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  favorites           Favorite[]
+  messages            Message[]
+  properties          Property[]    @relation("AgentProperties")
+  appointmentsAsUser  Appointment[] @relation("UserAppointments")
+  appointmentsAsAgent Appointment[] @relation("AgentAppointments")
+  agentProfile        AgentProfile?
+
+  auditLogs AuditLog[]
+}
+
+model AgentProfile {
+  id          Int     @id @default(autoincrement())
+  userId      Int     @unique
+  companyName String?
+  bio         String?
+  avatarUrl   String?
+  user        User    @relation(fields: [userId], references: [id])
+}
+
+model City {
+  id         Int        @id @default(autoincrement())
+  name       String
+  slug       String     @unique
+  districts  District[]
+  properties Property[]
+}
+
+model District {
+  id         Int        @id @default(autoincrement())
+  name       String
+  cityId     Int
+  city       City       @relation(fields: [cityId], references: [id])
+  properties Property[]
+}
+
+model Property {
+  id          Int               @id @default(autoincrement())
+  title       String
+  description String
+  price       Int
+  currency    String            @default("XOF")
+  purpose     ListingPurpose
+  type        PropertyType
+  status      PropertyStatus    @default(AVAILABLE)
+  bedrooms    Int?
+  bathrooms   Int?
+  toilets     Int?
+  surfaceM2   Float?
+  floor       Int?
+  rooms       Int?
+  furnishing  Furnishing?
+  features    PropertyFeature[]
+  images      PropertyImage[]
+
+  cityId Int?
+  city   City? @relation(fields: [cityId], references: [id])
+
+  districtId Int?
+  district   District? @relation(fields: [districtId], references: [id])
+
+  address   String?
+  latitude  Float?
+  longitude Float?
+
+  agentId Int?
+  agent   User? @relation("AgentProperties", fields: [agentId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  visits3D     Asset3D[]
+  favorites    Favorite[]
+  appointments Appointment[]
+  stats        PropertyStat?
+
+  slug        String    @unique
+  isFeatured  Boolean   @default(false)
+  publishedAt DateTime?
+  externalId  String?
+  messages    Message[]
+}
+
+model PropertyImage {
+  id         Int      @id @default(autoincrement())
+  url        String
+  width      Int?
+  height     Int?
+  altText    String?
+  order      Int      @default(0)
+  propertyId Int
+  property   Property @relation(fields: [propertyId], references: [id])
+  provider   String?
+  uploadedAt DateTime @default(now())
+}
+
+model Feature {
+  id                   Int               @id @default(autoincrement())
+  name                 String            @unique
+  featuresOnProperties PropertyFeature[]
+}
+
+model PropertyFeature {
+  id         Int      @id @default(autoincrement())
+  propertyId Int
+  featureId  Int
+  property   Property @relation(fields: [propertyId], references: [id])
+  feature    Feature  @relation(fields: [featureId], references: [id])
+
+  @@unique([propertyId, featureId])
+}
+
+model Favorite {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  propertyId Int
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id])
+  property   Property @relation(fields: [propertyId], references: [id])
+
+  @@unique([userId, propertyId])
+}
+
+model Appointment {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  propertyId   Int
+  agentId      Int?
+  scheduledFor DateTime
+  status       String   @default("PENDING")
+  notes        String?
+
+  user     User     @relation("UserAppointments", fields: [userId], references: [id])
+  agent    User?    @relation("AgentAppointments", fields: [agentId], references: [id])
+  property Property @relation(fields: [propertyId], references: [id])
+}
+
+model Asset3D {
+  id         Int      @id @default(autoincrement())
+  propertyId Int
+  title      String?
+  provider   String
+  assetUrl   String
+  thumbnail  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  property   Property @relation(fields: [propertyId], references: [id])
+}
+
+model PropertyStat {
+  id         Int       @id @default(autoincrement())
+  propertyId Int       @unique
+  views      Int       @default(0)
+  contacts   Int       @default(0)
+  favs       Int       @default(0)
+  lastViewed DateTime?
+  property   Property  @relation(fields: [propertyId], references: [id])
+}
+
+model Message {
+  id          Int       @id @default(autoincrement())
+  senderName  String?
+  senderEmail String?
+  senderPhone String?
+  userId      Int?
+  propertyId  Int?
+  body        String
+  read        Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  user        User?     @relation(fields: [userId], references: [id])
+  property    Property? @relation(fields: [propertyId], references: [id])
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  actorId   Int?
+  action    String
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id])
+}
