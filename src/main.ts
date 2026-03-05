@@ -8,7 +8,7 @@ async function bootstrap() {
   const corsOriginsRaw =
     process.env.CORS_ORIGINS ||
     process.env.FRONTEND_URL ||
-    'http://localhost:5173,http://localhost:3000';
+    'http://localhost:5173,https://immo-front.vercel.app';
   const corsOrigins = corsOriginsRaw
     .split(',')
     .map((s) => s.trim())
