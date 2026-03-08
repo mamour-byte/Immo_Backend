@@ -4,14 +4,14 @@ import { ListingPurpose, PropertyType, Furnishing, PropertyStatus } from '@prism
 import { Transform } from 'class-transformer';
 
 export class CreatePropertyWithImagesDto {
-  @IsString() title: string;
-  @IsString() description: string;
+  @IsString() title!: string;
+  @IsString() description!: string;
   
   @Transform(({ value }) => Number(value))
-  @IsInt() @Min(0) price: number;
+  @IsInt() @Min(0) price!: number;
   
-  @IsEnum(ListingPurpose) purpose: ListingPurpose;
-  @IsEnum(PropertyType) type: PropertyType;
+  @IsEnum(ListingPurpose) purpose!: ListingPurpose;
+  @IsEnum(PropertyType) type!: PropertyType;
 
   @IsOptional()
   @IsEnum(PropertyStatus)
@@ -70,8 +70,8 @@ export class CreatePropertyWithImagesDto {
 }
 
 export class Asset3DDto {
-  @IsString() provider: string;
-  @IsString() assetUrl: string;
+  @IsString() provider!: string;
+  @IsString() assetUrl!: string;
   @IsOptional() @IsString() title?: string;
   @IsOptional() @IsString() thumbnail?: string;
 }

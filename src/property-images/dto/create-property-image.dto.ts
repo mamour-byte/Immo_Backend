@@ -3,8 +3,7 @@ import { IsString, IsInt, IsOptional } from 'class-validator';
 
 export class CreatePropertyImageDto {
   @IsString()
-  url: string;
-    url!: string;
+  url!: string;
 
   @IsOptional()
   @IsInt()
@@ -23,7 +22,6 @@ export class CreatePropertyImageDto {
   order?: number;
 
   @IsInt()
-  propertyId: number; // ID de la propriété associée
-    propertyId!: number; // ID de la propriété associée
+  propertyId!: number; // ID de la propriété associée
 }
 
