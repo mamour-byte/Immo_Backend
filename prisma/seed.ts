@@ -16,7 +16,7 @@ async function main() {
         email: 'mamour@gmail.com',
         passwordHash: password,
         role: 'ADMIN', // Assure-toi que ton enum ou champ role existe
-        name: 'Mamour Fall',
+        fullName: 'Mamour Fall',
       },
     });
     console.log('Admin user created!');
