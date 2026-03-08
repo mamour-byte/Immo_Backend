@@ -2,11 +2,11 @@ import { IsString, IsInt, IsOptional, IsEnum, IsNumber, IsArray, IsBoolean, Min 
 import { ListingPurpose, PropertyType, Furnishing } from '@prisma/client';
 
 export class CreatePropertyDto {
-  @IsString() title: string;
-  @IsString() description: string;
-  @IsInt() @Min(0) price: number;
-  @IsEnum(ListingPurpose) purpose: ListingPurpose;
-  @IsEnum(PropertyType) type: PropertyType;
+  @IsString() title!: string;
+  @IsString() description!: string;
+  @IsInt() @Min(0) price!: number;
+  @IsEnum(ListingPurpose) purpose!: ListingPurpose;
+  @IsEnum(PropertyType) type!: PropertyType;
 
   @IsOptional() @IsInt() bedrooms?: number;
   @IsOptional() @IsInt() bathrooms?: number;
@@ -30,8 +30,8 @@ export class CreatePropertyDto {
 }
 
 export class Asset3DDto {
-  @IsString() provider: string;
-  @IsString() assetUrl: string;
+  @IsString() provider!: string;
+  @IsString() assetUrl!: string;
   @IsOptional() @IsString() title?: string;
   @IsOptional() @IsString() thumbnail?: string;
 }

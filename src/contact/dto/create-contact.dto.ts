@@ -4,11 +4,11 @@ import { Type, Transform } from 'class-transformer';
 export class CreateContactDto {
   @IsNotEmpty()
   @IsString()
-  name: string;
+    name!: string;
 
   @IsNotEmpty()
   @IsEmail()
-  email: string;
+    email!: string;
 
   @IsOptional()
   @IsString()
@@ -16,7 +16,7 @@ export class CreateContactDto {
 
   @IsNotEmpty()
   @IsString()
-  message: string;
+    message!: string;
 
   @IsOptional()
   @Transform(({ value }) => value ? Number(value) : undefined)
