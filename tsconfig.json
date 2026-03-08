@@ -1,7 +1,6 @@
 {
   "compilerOptions": {
-    // "ignoreDeprecations": "6.0",
-    "module": "NodeNext",
+    "module": "commonjs",
     "moduleResolution": "nodenext",
     "resolvePackageJsonExports": true,
     "esModuleInterop": true,
