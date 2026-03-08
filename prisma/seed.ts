@@ -18,9 +18,9 @@ async function main() {
     data: { name: 'Diourbel', slug: 'diourbel' }
   });
 
-  
+
   // --- QUARTIERS DAKAR ---
-  const almadies = await prisma.district.create({ data: { name: 'Almadies', cityId: dakar.id } });
+  prisma.district.create({ data: { name: 'Almadies', cityId: dakar.id } });
   const plateau = await prisma.district.create({ data: { name: 'Plateau', cityId: dakar.id } });
   const ouakam = await prisma.district.create({ data: { name: 'Ouakam', cityId: dakar.id } });
   const mermoz = await prisma.district.create({ data: { name: 'Mermoz', cityId: dakar.id } });
@@ -53,8 +53,6 @@ async function main() {
   const securite = await prisma.feature.create({ data: { name: 'Sécurité 24/7' } });
   const parking = await prisma.feature.create({ data: { name: 'Parking' } });
   const terrasse = await prisma.feature.create({ data: { name: 'Terrasse' } });
-
-
 
 
   const password = await bcrypt.hash('Mamour123', 10);
