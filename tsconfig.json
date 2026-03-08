@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
-    "module": "nodenext",
+    // "ignoreDeprecations": "6.0",
+    "module": "NodeNext",
     "moduleResolution": "nodenext",
     "resolvePackageJsonExports": true,
     "esModuleInterop": true,

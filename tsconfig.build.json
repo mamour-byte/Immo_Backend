@@ -3,7 +3,7 @@
   "compilerOptions": {
     "outDir": "./dist",
     "baseUrl": "./",
-    "rootDir": "src" 
+    "rootDir": "./src" 
   },
   "exclude": ["node_modules", "test", "dist", "**/*spec.ts"]
 }
