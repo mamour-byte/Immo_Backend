@@ -1,30 +1,3 @@
-export class PropertyFilterDto {
-  page?: number;
-  limit?: number;
-  sortBy?: 'recent' | 'price-asc' | 'price-desc' | 'surface';
-  order?: 'asc' | 'desc';
-
-  minPrice?: number | string;
-  maxPrice?: number | string;
-
-  type?: string;
-  purpose?: string;
-  status?: string;
-
-  cityId?: number | string;
-  districtId?: number | string;
-
-  bedrooms?: number | string;
-  bathrooms?: number | string;
-
-  minSurface?: number | string;
-  maxSurface?: number | string;
-
-  features?: number[];
-
-  search?: string;
-}
-
 import {
   IsOptional,
   IsInt,

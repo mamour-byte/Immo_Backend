@@ -1,21 +1,3 @@
-export class CreatePropertyDto {
-  title: string;
-  description?: string;
-  price?: number | string;
-  cityId?: number | string;
-  districtId?: number | string;
-  toilets?: number | string;
-  features?: number[];
-  images?: string[];
-  assets3D?: {
-    provider: string;
-    assetUrl: string;
-    title?: string;
-    thumbnail?: string;
-  }[];
-}
-
-// create-property.dto.ts
 import { IsString, IsInt, IsOptional, IsEnum, IsNumber, IsArray, IsBoolean, Min } from 'class-validator';
 import { ListingPurpose, PropertyType, Furnishing } from '@prisma/client';
 

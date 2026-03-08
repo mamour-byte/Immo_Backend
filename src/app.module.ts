@@ -1,12 +1,4 @@
 import { Module } from '@nestjs/common';
-import { PropertiesModule } from './properties/properties.module';
-
-@Module({
-  imports: [PropertiesModule],
-})
-export class AppModule {}
-
-import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';

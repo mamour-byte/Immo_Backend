@@ -1,49 +1,4 @@
 import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Query,
-} from '@nestjs/common';
-import { PropertyService } from './properties.service';
-import { CreatePropertyDto } from './dto/create-property.dto';
-import { UpdatePropertyDto } from './dto/update-property.dto';
-import { PropertyFilterDto } from './dto/property-filter.dto';
-
-@Controller('properties')
-export class PropertyController {
-  constructor(private readonly propertyService: PropertyService) {}
-
-  @Post()
-  create(@Body() dto: CreatePropertyDto) {
-    return this.propertyService.create(dto);
-  }
-
-  @Get()
-  findAll(@Query() filters: PropertyFilterDto) {
-    return this.propertyService.findAll(filters);
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.propertyService.findOne(Number(id));
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdatePropertyDto) {
-    return this.propertyService.update(Number(id), dto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.propertyService.remove(Number(id));
-  }
-}
-
-import {
   Controller,
   Get,
   Post,
@@ -148,8 +103,9 @@ export class PropertyController {
       };
     } catch (error) {
       console.error('Erreur lors de la création de propriété avec images:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erreur lors de la création de la propriété avec images';
       throw new BadRequestException(
-        error.message || 'Erreur lors de la création de la propriété avec images',
+        errorMessage || 'Erreur lors de la création de la propriété avec images',
       );
     }
   }
