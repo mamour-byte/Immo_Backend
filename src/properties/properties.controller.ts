@@ -16,7 +16,7 @@ import {
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { cloudinaryStorage } from '../cloudinary/cloudinary-storage';
-import { PrismaService } from "../../prisma/prisma.service";
+import { PrismaService } from "../prisma/prisma.service";
 import { PropertyService } from './properties.service';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { CreatePropertyWithImagesDto } from './dto/create-property-with-images.dto';

@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { PropertyController } from './properties.controller';
 import { PropertyService } from './properties.service';
 import { PropertyFilterDto } from './dto/property-filter.dto';
-import { PrismaService } from '../../prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { AuthModule } from '../auth/auth.module';
 
 

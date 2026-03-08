@@ -1,6 +1,6 @@
 // property-image.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { CreatePropertyImageDto } from './dto/create-property-image.dto';
 import { UpdatePropertyImageDto } from './dto/update-property-image.dto';
 

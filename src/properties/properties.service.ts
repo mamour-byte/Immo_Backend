@@ -1,7 +1,7 @@
 // property.service.ts
 
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { UpdatePropertyDto } from './dto/update-property.dto';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { PropertyFilterDto } from './dto/property-filter.dto';
