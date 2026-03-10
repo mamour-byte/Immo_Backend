@@ -5,7 +5,10 @@ import {
   IsString,
   IsArray,
   IsNumber,
+  IsIn,
   Min,
+  Max,
+  MinLength,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { ListingPurpose, PropertyType, PropertyStatus } from '@prisma/client';
@@ -76,7 +79,10 @@ export class PropertyFilterDto {
   @IsOptional()
   @Transform(({ value }) => {
     if (typeof value === 'string') {
-        return value.split(',').map((v) => Number(v.trim()));
+        return value
+          .split(',')
+          .map((v) => Number(v.trim()))
+          .filter((n) => !Number.isNaN(n));
     }
     return value;
   })
@@ -86,7 +92,7 @@ export class PropertyFilterDto {
 
   @IsOptional()
   @IsString()
-  @Min(3) 
+  @MinLength(3)
   search?: string;
 
   // --- Pagination ---
@@ -94,12 +100,15 @@ export class PropertyFilterDto {
   @Transform(({ value }) => value ? Number(value) : 1)
   @Type(() => Number)
   @IsInt()
+  @Min(1)
   page: number = 1;
 
   @IsOptional()
   @Transform(({ value }) => value ? Number(value) : 20)
   @Type(() => Number)
   @IsInt()
+  @Min(1)
+  @Max(100)
   limit: number = 20;
 
   @IsOptional()
@@ -107,6 +116,6 @@ export class PropertyFilterDto {
   sortBy?: string;
 
   @IsOptional()
-  @IsEnum(['asc', 'desc'])
+  @IsIn(['asc', 'desc'])
   order?: 'asc' | 'desc';
 }

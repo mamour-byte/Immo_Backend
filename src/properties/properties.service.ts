@@ -146,7 +146,8 @@ async update(id: number, dto: UpdatePropertyDto) {
   }
 
   if (assets3D !== undefined) {
-    updateData.assets3D = { deleteMany: {}, create: assets3D.map((asset) => ({
+    // Prisma relation is `visits3D` (model Asset3D[]); DTO uses `assets3D`.
+    updateData.visits3D = { deleteMany: {}, create: assets3D.map((asset) => ({
       provider: asset.provider,
       assetUrl: asset.assetUrl,
       title: asset.title,
