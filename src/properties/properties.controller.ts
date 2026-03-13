@@ -112,8 +112,10 @@ export class PropertyController {
 
   // FIND ALL
   @Get()
-  findAll(@Query() filters: PropertyFilterDto) {
-    return this.propertyService.findAll(filters);
+  findAll(@Query() filters: PropertyFilterDto, @Request() req) {
+    // Récupère le rôle de l'utilisateur connecté (si présent)
+    const userRole = req?.user?.role || null;
+    return this.propertyService.findAll(filters, userRole);
   }
 
 

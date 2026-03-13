@@ -64,13 +64,12 @@ async create(dto: CreatePropertyDto) {
     });
 }
 
-async findAll(filters: PropertyFilterDto) {
+async findAll(filters: PropertyFilterDto, userRole?: string) {
   const { page = 1, limit = 20, sortBy, order = 'desc' } = filters;
   const skip = (page - 1) * limit;
 
   // Construire l'orderBy selon le sortBy
   let orderBy: Prisma.PropertyOrderByWithRelationInput = { createdAt: 'desc' };
-  
   if (sortBy) {
     switch (sortBy) {
       case 'recent':
@@ -92,19 +91,19 @@ async findAll(filters: PropertyFilterDto) {
 
   const [items, total] = await Promise.all([
     this.prisma.property.findMany({
-      where: this.buildWhereClause(filters),
+      where: this.buildWhereClause(filters, userRole),
       include: {
         city: true,
         district: true,
         features: { include: { feature: true } },
         images: true,
-        visits3D: true,  // <- ajout ici
+        visits3D: true,
       },
       skip,
       take: limit,
       orderBy,
     }),
-    this.prisma.property.count({ where: this.buildWhereClause(filters) }),
+    this.prisma.property.count({ where: this.buildWhereClause(filters, userRole) }),
   ]);
 
   return { page, total, totalPages: Math.ceil(total / limit), items };
@@ -277,7 +276,7 @@ async update(id: number, dto: UpdatePropertyDto) {
     }
   }
 
-  private buildWhereClause(filters: PropertyFilterDto): Prisma.PropertyWhereInput {
+  private buildWhereClause(filters: PropertyFilterDto, userRole?: string): Prisma.PropertyWhereInput {
     const {
       minPrice, maxPrice, type, purpose, status, cityId, districtId,
       bedrooms, bathrooms, minSurface, maxSurface, features, search,
@@ -294,7 +293,13 @@ async update(id: number, dto: UpdatePropertyDto) {
 
     if (type) where.type = type;
     if (purpose) where.purpose = purpose;
-    if (status) where.status = status;
+
+    if (status) {
+      where.status = status;
+    } else if (!userRole || userRole !== 'ADMIN') {
+      // Si pas admin, on masque les biens loués ou vendus
+      where.status = { notIn: ['LOUE', 'VENDU'] };
+    }
 
     if (cityId) where.cityId = typeof cityId === 'string' ? Number(cityId) : cityId;
     if (districtId) where.districtId = typeof districtId === 'string' ? Number(districtId) : districtId;
