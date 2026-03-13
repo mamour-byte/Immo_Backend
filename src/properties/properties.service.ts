@@ -110,7 +110,7 @@ async findAll(filters: PropertyFilterDto, userRole?: string) {
 }
   
 
-async findOne(id: number) {
+async findOne(id: number, userRole?: string) {
   const item = await this.prisma.property.findUnique({
     where: { id },
     include: {
@@ -122,6 +122,11 @@ async findOne(id: number) {
     },
   });
   if (!item) throw new NotFoundException(`Propriété avec ID ${id} non trouvée.`);
+  const isAdmin = userRole === 'ADMIN';
+  if (!isAdmin && (item.status === PropertyStatus.SOLD || item.status === PropertyStatus.RENTED)) {
+    throw new NotFoundException(`Propriete avec ID ${id} non trouvee.`);
+  }
+
   return item;
 }
 
@@ -294,11 +299,25 @@ async update(id: number, dto: UpdatePropertyDto) {
     if (type) where.type = type;
     if (purpose) where.purpose = purpose;
 
+    const isAdmin = userRole === 'ADMIN';
+
     if (status) {
       where.status = status;
-    } else if (!userRole || userRole !== 'ADMIN') {
+    } else if (!isAdmin) {
       // Si pas admin, on masque les biens loués ou vendus
-      where.status = { notIn: [PropertyStatus.LOUE, PropertyStatus.VENDU] };
+      where.status = { notIn: [PropertyStatus.RENTED, PropertyStatus.SOLD] };
+    }
+
+    if (!isAdmin && status) {
+      // Interdit de recuperer des biens vendus/loues via le filtre `status`.
+      where.AND = [
+        ...(where.AND
+          ? Array.isArray(where.AND)
+            ? where.AND
+            : [where.AND]
+          : []),
+        { status: { notIn: [PropertyStatus.RENTED, PropertyStatus.SOLD] } },
+      ];
     }
 
     if (cityId) where.cityId = typeof cityId === 'string' ? Number(cityId) : cityId;

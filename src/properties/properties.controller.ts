@@ -8,6 +8,7 @@ import {
   Patch,
   ParseIntPipe,
   Query,
+  Req,
   UseInterceptors,
   UploadedFiles,
   BadRequestException,
@@ -24,8 +25,13 @@ import { CreatePropertyWithImagesDto } from './dto/create-property-with-images.d
 import { UpdatePropertyDto } from './dto/update-property.dto';
 import { PropertyFilterDto } from './dto/property-filter.dto';
 import { JwtAuthGuard } from '../auth/jwt.guard';
+import { JwtOptionalAuthGuard } from '../auth/jwt-optional.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
+
+type RequestWithOptionalUserRole = ExpressRequest & {
+  user?: { role?: string } | null;
+};
 
 @Controller('properties')
 export class PropertyController {
@@ -113,17 +119,20 @@ export class PropertyController {
 
   // FIND ALL
   @Get()
-  findAll(@Query() filters: PropertyFilterDto, @Request() req: ExpressRequest) {
+  @UseGuards(JwtOptionalAuthGuard)
+  findAll(@Query() filters: PropertyFilterDto, @Req() req: RequestWithOptionalUserRole) {
     // Récupère le rôle de l'utilisateur connecté (si présent)
-    const userRole = req?.user?.role || null;
+    const userRole = req?.user?.role;
     return this.propertyService.findAll(filters, userRole);
   }
 
 
   // FIND ONE
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.propertyService.findOne(id);
+  @UseGuards(JwtOptionalAuthGuard)
+  findOne(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithOptionalUserRole) {
+    const userRole = req?.user?.role;
+    return this.propertyService.findOne(id, userRole);
   }
 
   // UPDATE
