@@ -5,7 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UpdatePropertyDto } from './dto/update-property.dto';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { PropertyFilterDto } from './dto/property-filter.dto';
-import {  Prisma } from '@prisma/client';
+import {  Prisma, PropertyStatus } from '@prisma/client';
 import slugify from 'slugify';
 
 @Injectable()
@@ -298,7 +298,7 @@ async update(id: number, dto: UpdatePropertyDto) {
       where.status = status;
     } else if (!userRole || userRole !== 'ADMIN') {
       // Si pas admin, on masque les biens loués ou vendus
-      where.status = { notIn: ['LOUE', 'VENDU'] };
+      where.status = { notIn: [PropertyStatus.LOUE, PropertyStatus.VENDU] };
     }
 
     if (cityId) where.cityId = typeof cityId === 'string' ? Number(cityId) : cityId;

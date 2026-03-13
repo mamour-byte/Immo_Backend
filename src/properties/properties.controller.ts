@@ -15,6 +15,7 @@ import {
   
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
+import { Request as ExpressRequest } from 'express';
 import { cloudinaryStorage } from '../cloudinary/cloudinary-storage';
 import { PrismaService } from "../prisma/prisma.service";
 import { PropertyService } from './properties.service';
@@ -112,7 +113,7 @@ export class PropertyController {
 
   // FIND ALL
   @Get()
-  findAll(@Query() filters: PropertyFilterDto, @Request() req) {
+  findAll(@Query() filters: PropertyFilterDto, @Request() req: ExpressRequest) {
     // Récupère le rôle de l'utilisateur connecté (si présent)
     const userRole = req?.user?.role || null;
     return this.propertyService.findAll(filters, userRole);
