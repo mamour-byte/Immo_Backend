@@ -5,15 +5,36 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UpdatePropertyDto } from './dto/update-property.dto';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { PropertyFilterDto } from './dto/property-filter.dto';
-import {  Prisma, PropertyStatus } from '@prisma/client';
+import { Prisma, PropertyStatus } from '@prisma/client';
+import { Express } from 'express';
 import slugify from 'slugify';
 
 @Injectable()
 export class PropertyService {
   constructor(private prisma: PrismaService) {}
 
+  private buildOrderBy(
+    sortBy: string | undefined,
+    order: 'asc' | 'desc' | undefined,
+  ): Prisma.PropertyOrderByWithRelationInput {
+    const direction = order ?? 'desc';
+
+    switch (sortBy) {
+      case 'recent':
+        return { createdAt: direction };
+      case 'price-asc':
+        return { price: 'asc' };
+      case 'price-desc':
+        return { price: 'desc' };
+      case 'surface':
+        return { surfaceM2: direction };
+      default:
+        return { createdAt: 'desc' };
+    }
+  }
+
   // property.service.ts (extraits)
-async create(dto: CreatePropertyDto) {
+  async create(dto: CreatePropertyDto) {
   const { cityId, districtId, images, features, assets3D, title, agentId, ...data } = dto;
 
   const slug = slugify(title, { lower: true, strict: true, locale: 'fr' });
@@ -65,50 +86,32 @@ async create(dto: CreatePropertyDto) {
     });
 }
 
-async findAll(filters: PropertyFilterDto, userRole?: string) {
-  const { page = 1, limit = 20, sortBy, order = 'desc' } = filters;
-  const skip = (page - 1) * limit;
+  async findAll(filters: PropertyFilterDto, userRole?: string) {
+    const { page = 1, limit = 20, sortBy, order = 'desc' } = filters;
+    const skip = (page - 1) * limit;
+    const orderBy = this.buildOrderBy(sortBy, order);
 
-  // Construire l'orderBy selon le sortBy
-  let orderBy: Prisma.PropertyOrderByWithRelationInput = { createdAt: 'desc' };
-  if (sortBy) {
-    switch (sortBy) {
-      case 'recent':
-        orderBy = { createdAt: order as 'asc' | 'desc' };
-        break;
-      case 'price-asc':
-        orderBy = { price: 'asc' };
-        break;
-      case 'price-desc':
-        orderBy = { price: 'desc' };
-        break;
-      case 'surface':
-        orderBy = { surfaceM2: order as 'asc' | 'desc' };
-        break;
-      default:
-        orderBy = { createdAt: 'desc' };
-    }
+    const where = this.buildWhereClause(filters, userRole);
+
+    const [items, total] = await Promise.all([
+      this.prisma.property.findMany({
+        where,
+        include: {
+          city: true,
+          district: true,
+          features: { include: { feature: true } },
+          images: true,
+          visits3D: true,
+        },
+        skip,
+        take: limit,
+        orderBy,
+      }),
+      this.prisma.property.count({ where }),
+    ]);
+
+    return { page, total, totalPages: Math.ceil(total / limit), items };
   }
-
-  const [items, total] = await Promise.all([
-    this.prisma.property.findMany({
-      where: this.buildWhereClause(filters, userRole),
-      include: {
-        city: true,
-        district: true,
-        features: { include: { feature: true } },
-        images: true,
-        visits3D: true,
-      },
-      skip,
-      take: limit,
-      orderBy,
-    }),
-    this.prisma.property.count({ where: this.buildWhereClause(filters, userRole) }),
-  ]);
-
-  return { page, total, totalPages: Math.ceil(total / limit), items };
-}
   
 
 async findOne(id: number, userRole?: string) {
@@ -134,26 +137,7 @@ async findOne(id: number, userRole?: string) {
   async findMine(filters: PropertyFilterDto, agentId: number) {
     const { page = 1, limit = 20, sortBy, order = 'desc' } = filters;
     const skip = (page - 1) * limit;
-
-    let orderBy: Prisma.PropertyOrderByWithRelationInput = { createdAt: 'desc' };
-    if (sortBy) {
-      switch (sortBy) {
-        case 'recent':
-          orderBy = { createdAt: order as 'asc' | 'desc' };
-          break;
-        case 'price-asc':
-          orderBy = { price: 'asc' };
-          break;
-        case 'price-desc':
-          orderBy = { price: 'desc' };
-          break;
-        case 'surface':
-          orderBy = { surfaceM2: order as 'asc' | 'desc' };
-          break;
-        default:
-          orderBy = { createdAt: 'desc' };
-      }
-    }
+    const orderBy = this.buildOrderBy(sortBy, order);
 
     const baseWhere = this.buildWhereClause(filters, 'ADMIN');
     const where: Prisma.PropertyWhereInput = {
@@ -322,6 +306,50 @@ async update(id: number, dto: UpdatePropertyDto) {
 
       return property;
     });
+  }
+
+  // --- CREATE/UPLOAD IMAGES UTILITIES ---
+
+  async addImages(
+    propertyId: number,
+    files: Express.Multer.File[],
+    actor?: { id: number; role: string },
+  ) {
+    if (!files || files.length === 0) {
+      return { success: false, images: [], uploaded: 0 };
+    }
+
+    if (actor?.role === 'AGENT') {
+      await this.assertAgentOwnsProperty(propertyId, actor.id);
+    }
+
+    const savedImages: any[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      try {
+        const img = await this.prisma.propertyImage.create({
+          data: {
+            url: (file as any).path ?? (file as any).secure_url ?? file.filename,
+            propertyId,
+            order: i,
+            provider: 'cloudinary',
+          },
+        });
+        savedImages.push(img);
+      } catch (err) {
+        // On continue pour les fichiers suivants mais on log l'erreur
+        // pour pouvoir la diagnostiquer.
+        // eslint-disable-next-line no-console
+        console.error("Erreur en sauvegardant l'image en base :", err);
+      }
+    }
+
+    return {
+      success: true,
+      images: savedImages,
+      uploaded: files.length,
+    };
   }
 
   // --- REMOVE ---

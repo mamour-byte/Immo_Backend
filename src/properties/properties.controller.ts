@@ -13,12 +13,10 @@ import {
   UploadedFiles,
   BadRequestException,
   UseGuards,
-  ForbiddenException,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { Request as ExpressRequest } from 'express';
 import { cloudinaryStorage } from '../cloudinary/cloudinary-storage';
-import { PrismaService } from "../prisma/prisma.service";
 import { PropertyService } from './properties.service';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { CreatePropertyWithImagesDto } from './dto/create-property-with-images.dto';
@@ -35,10 +33,7 @@ type RequestWithOptionalUserRole = ExpressRequest & {
 
 @Controller('properties')
 export class PropertyController {
-  constructor(
-    private readonly propertyService: PropertyService,
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly propertyService: PropertyService) {}
 
   private static readonly MAX_IMAGE_BYTES =
     Number(process.env.MAX_IMAGE_BYTES) > 0
@@ -181,45 +176,21 @@ export class PropertyController {
     @Body('propertyId') propertyId: number,
     @Req() req: RequestWithOptionalUserRole,
   ) {
-    if (!files || files.length === 0) {
+    const actor =
+      req?.user && req.user.id && req.user.role
+        ? { id: Number(req.user.id), role: String(req.user.role) }
+        : undefined;
+
+    const result = await this.propertyService.addImages(
+      Number(propertyId),
+      files || [],
+      actor,
+    );
+
+    if (!result.success) {
       return { success: false, message: 'Aucun fichier reçu' };
     }
 
-    if (req?.user?.role === 'AGENT') {
-      const prop = await this.prisma.property.findUnique({
-        where: { id: Number(propertyId) },
-        select: { agentId: true },
-      });
-      if (!prop || prop.agentId !== req?.user?.id) {
-        throw new ForbiddenException("Vous ne pouvez modifier que les biens que vous avez créés.");
-      }
-    }
-
-    const savedImages: any[] = [];
-
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      try {
-        const img = await this.prisma.propertyImage.create({
-          data: {
-            url: (file as any).path ?? (file as any).secure_url ?? file.filename,
-            propertyId: Number(propertyId),
-            order: i,
-            provider: 'cloudinary',
-          },
-        });
-
-        savedImages.push(img);
-      } catch (err) {
-        // continue on error for individual images but log via console for now
-        console.error('Erreur en sauvegardant l\'image en base :', err);
-      }
-    }
-
-    return {
-      success: true,
-      images: savedImages,
-      uploaded: files.length,
-    };
+    return result;
   }
 }
