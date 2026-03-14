@@ -55,7 +55,7 @@ async function main() {
   const terrasse = await prisma.feature.create({ data: { name: 'Terrasse' } });
 
 
-  const password = await bcrypt.hash('Mamour123', 10);
+  const password = await bcrypt.hash('Nadiath123', 10);
 
   const existingAdmin = await prisma.user.findUnique({
     where: { email: 'admin@example.com' },
@@ -64,10 +64,10 @@ async function main() {
   if (!existingAdmin) {
     await prisma.user.create({
       data: {
-        email: 'mamour@gmail.com',
+        email: 'nadiath@gmail.com',
         passwordHash: password,
-        role: 'ADMIN', // Assure-toi que ton enum ou champ role existe
-        fullName: 'Mamour Fall',
+        role: 'AGENT',
+        fullName: 'Nadiath Lawognie',
       },
     });
     console.log('Admin user created!');
