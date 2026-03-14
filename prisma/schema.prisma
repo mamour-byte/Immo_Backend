@@ -46,6 +46,12 @@ enum Furnishing {
   UNFURNISHED
 }
 
+enum AgentApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 /**
  * * MODELS **
  */
@@ -66,8 +72,31 @@ model User {
   appointmentsAsUser  Appointment[] @relation("UserAppointments")
   appointmentsAsAgent Appointment[] @relation("AgentAppointments")
   agentProfile        AgentProfile?
+  agentApplication    AgentApplication?
+  reviewedApplications AgentApplication[] @relation("ReviewedApplications")
 
   auditLogs AuditLog[]
+}
+
+model AgentApplication {
+  id           Int                    @id @default(autoincrement())
+  userId       Int                    @unique
+  status       AgentApplicationStatus  @default(PENDING)
+
+  companyName  String?
+  bio          String?
+  avatarUrl    String?
+
+  submittedAt  DateTime               @default(now())
+  reviewedAt   DateTime?
+  reviewedById Int?
+  decisionNote String?
+
+  user       User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy User? @relation("ReviewedApplications", fields: [reviewedById], references: [id])
+
+  @@index([status])
+  @@index([submittedAt])
 }
 
 model AgentProfile {

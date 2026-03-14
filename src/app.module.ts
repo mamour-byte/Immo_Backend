@@ -15,9 +15,10 @@ import { MessagesModule } from './messages/messages.module';
 import { CitiesModule } from './cities/cities.module';
 import { DistrictsModule } from './districts/districts.module';
 import { ContactModule } from './contact/contact.module';
+import { AgentApplicationsModule } from './agent-applications/agent-applications.module';
 
 @Module({
-  imports: [PrismaModule, UsersModule, AuthModule, AgentsModule, PropertiesModule, PropertyImageModule, FeaturesModule, AppointmentsModule, FavoritesModule, Asset3DModule, MessagesModule, CitiesModule, DistrictsModule, ContactModule],
+  imports: [PrismaModule, UsersModule, AuthModule, AgentsModule, AgentApplicationsModule, PropertiesModule, PropertyImageModule, FeaturesModule, AppointmentsModule, FavoritesModule, Asset3DModule, MessagesModule, CitiesModule, DistrictsModule, ContactModule],
   controllers: [AppController],
   providers: [AppService],
 })

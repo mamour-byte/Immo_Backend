@@ -13,7 +13,7 @@ import {
   UploadedFiles,
   BadRequestException,
   UseGuards,
-  
+  ForbiddenException,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { Request as ExpressRequest } from 'express';
@@ -30,7 +30,7 @@ import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 
 type RequestWithOptionalUserRole = ExpressRequest & {
-  user?: { role?: string } | null;
+  user?: { id?: number; role?: string } | null;
 };
 
 @Controller('properties')
@@ -61,19 +61,25 @@ export class PropertyController {
   // CREATE - Route classique sans images (pour compatibilité)
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
-  create(@Body() createPropertyDto: CreatePropertyDto) {
+  @Roles('ADMIN', 'AGENT')
+  create(@Body() createPropertyDto: CreatePropertyDto, @Req() req: RequestWithOptionalUserRole) {
+    const actorId = req?.user?.id;
+    const actorRole = req?.user?.role;
+    if (actorRole === 'AGENT' && actorId) {
+      createPropertyDto.agentId = actorId;
+    }
     return this.propertyService.create(createPropertyDto);
   }
 
   // CREATE WITH IMAGES - Nouvelle route unifiée
   @Post('with-images')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'AGENT')
   @UseInterceptors(FilesInterceptor('images', 15, PropertyController.imageUploadMulterOptions))
   async createWithImages(
     @Body() createPropertyDto: CreatePropertyWithImagesDto,
     @UploadedFiles() files: Express.Multer.File[],
+    @Req() req: RequestWithOptionalUserRole,
   ) {
     if (!createPropertyDto.title || !createPropertyDto.description || createPropertyDto.price === undefined) {
       throw new BadRequestException('Les champs title, description et price sont obligatoires');
@@ -98,6 +104,7 @@ export class PropertyController {
               ? createPropertyDto.features.map(f => Number(f))
               : [])
           : undefined,
+        agentId: req?.user?.role === 'AGENT' ? req?.user?.id : undefined,
       };
 
       const result = await this.propertyService.createWithImages(dto, files || []);
@@ -106,7 +113,7 @@ export class PropertyController {
         success: true,
         message: 'Propriété créée avec succès',
         data: result,
-        imagesCount: (result?.images as any[])?.length || 0,
+        imagesCount: Array.isArray((result as any)?.images) ? (result as any).images.length : 0,
       };
     } catch (error) {
       console.error('Erreur lors de la création de propriété avec images:', error);
@@ -126,6 +133,16 @@ export class PropertyController {
     return this.propertyService.findAll(filters, userRole);
   }
 
+  // FIND MINE (AGENT)
+  @Get('mine')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('AGENT')
+  findMine(@Query() filters: PropertyFilterDto, @Req() req: RequestWithOptionalUserRole) {
+    const actorId = req?.user?.id;
+    if (!actorId) throw new BadRequestException('Utilisateur invalide');
+    return this.propertyService.findMine(filters, actorId);
+  }
+
 
   // FIND ONE
   @Get(':id')
@@ -138,31 +155,44 @@ export class PropertyController {
   // UPDATE
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
-  update(@Param('id', ParseIntPipe) id: number, @Body() updatePropertyDto: UpdatePropertyDto) {
-    return this.propertyService.update(id, updatePropertyDto);
+  @Roles('ADMIN', 'AGENT')
+  update(@Param('id', ParseIntPipe) id: number, @Body() updatePropertyDto: UpdatePropertyDto, @Req() req: RequestWithOptionalUserRole) {
+    const actor = { id: Number(req?.user?.id), role: String(req?.user?.role) };
+    return this.propertyService.updateForActor(id, updatePropertyDto, actor);
   }
 
   // DELETE
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.propertyService.remove(id);
+  @Roles('ADMIN', 'AGENT')
+  remove(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithOptionalUserRole) {
+    const actor = { id: Number(req?.user?.id), role: String(req?.user?.role) };
+    return this.propertyService.removeForActor(id, actor);
   }
 
 
   // LEGACY: Upload images séparément (conservé pour compatibilité)
   @Post('upload-images')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'AGENT')
   @UseInterceptors(FilesInterceptor('images', 15, PropertyController.imageUploadMulterOptions))
   async uploadImages(
     @UploadedFiles() files: Express.Multer.File[],
     @Body('propertyId') propertyId: number,
+    @Req() req: RequestWithOptionalUserRole,
   ) {
     if (!files || files.length === 0) {
       return { success: false, message: 'Aucun fichier reçu' };
+    }
+
+    if (req?.user?.role === 'AGENT') {
+      const prop = await this.prisma.property.findUnique({
+        where: { id: Number(propertyId) },
+        select: { agentId: true },
+      });
+      if (!prop || prop.agentId !== req?.user?.id) {
+        throw new ForbiddenException("Vous ne pouvez modifier que les biens que vous avez créés.");
+      }
     }
 
     const savedImages: any[] = [];

@@ -31,6 +31,10 @@ export class CreatePropertyDto {
 
   @IsOptional() @IsArray() assets3D?: Asset3DDto[];
 
+  @IsOptional()
+  @IsInt()
+  agentId?: number;
+
 }
 
 export class Asset3DDto {

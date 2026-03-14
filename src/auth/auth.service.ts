@@ -1,9 +1,10 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import * as bcrypt from 'bcryptjs';
 import { JwtService } from '@nestjs/jwt';
+import { UpdateMeDto } from './dto/update-me.dto';
 
 @Injectable()
 export class AuthService {
@@ -77,5 +78,62 @@ export class AuthService {
       access_token: this.jwtService.sign(payload),
       user: this.sanitizeUser(user)
     };
+  }
+
+  async me(userId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        agentProfile: true,
+        agentApplication: true,
+      },
+    });
+    if (!user) throw new NotFoundException('Utilisateur introuvable');
+    return this.sanitizeUser(user);
+  }
+
+  async updateMe(userId: number, dto: UpdateMeDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true, agentProfile: { select: { id: true } } },
+    });
+    if (!user) throw new NotFoundException('Utilisateur introuvable');
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: {
+          fullName: dto.fullName,
+          phone: dto.phone,
+        },
+      });
+
+      if (dto.companyName !== undefined || dto.bio !== undefined || dto.avatarUrl !== undefined) {
+        await tx.agentProfile.upsert({
+          where: { userId },
+          create: {
+            userId,
+            companyName: dto.companyName,
+            bio: dto.bio,
+            avatarUrl: dto.avatarUrl,
+          },
+          update: {
+            companyName: dto.companyName,
+            bio: dto.bio,
+            avatarUrl: dto.avatarUrl,
+          },
+        });
+      }
+
+      return tx.user.findUnique({
+        where: { id: userId },
+        include: {
+          agentProfile: true,
+          agentApplication: true,
+        },
+      });
+    });
+
+    return this.sanitizeUser(updated);
   }
 }

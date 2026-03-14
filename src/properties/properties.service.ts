@@ -1,6 +1,6 @@
 // property.service.ts
 
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdatePropertyDto } from './dto/update-property.dto';
 import { CreatePropertyDto } from './dto/create-property.dto';
@@ -14,7 +14,7 @@ export class PropertyService {
 
   // property.service.ts (extraits)
 async create(dto: CreatePropertyDto) {
-  const { cityId, districtId, images, features, assets3D, title, ...data } = dto;
+  const { cityId, districtId, images, features, assets3D, title, agentId, ...data } = dto;
 
   const slug = slugify(title, { lower: true, strict: true, locale: 'fr' });
 
@@ -33,6 +33,7 @@ async create(dto: CreatePropertyDto) {
         ...data,
         title,
         slug: finalSlug,
+        agent: agentId ? { connect: { id: agentId } } : undefined,
         city: cityId ? { connect: { id: cityId } } : undefined,
         district: districtId ? { connect: { id: districtId } } : undefined,
         toilets: dto.toilets !== undefined ? Number(dto.toilets) : undefined,
@@ -130,8 +131,57 @@ async findOne(id: number, userRole?: string) {
   return item;
 }
 
+  async findMine(filters: PropertyFilterDto, agentId: number) {
+    const { page = 1, limit = 20, sortBy, order = 'desc' } = filters;
+    const skip = (page - 1) * limit;
+
+    let orderBy: Prisma.PropertyOrderByWithRelationInput = { createdAt: 'desc' };
+    if (sortBy) {
+      switch (sortBy) {
+        case 'recent':
+          orderBy = { createdAt: order as 'asc' | 'desc' };
+          break;
+        case 'price-asc':
+          orderBy = { price: 'asc' };
+          break;
+        case 'price-desc':
+          orderBy = { price: 'desc' };
+          break;
+        case 'surface':
+          orderBy = { surfaceM2: order as 'asc' | 'desc' };
+          break;
+        default:
+          orderBy = { createdAt: 'desc' };
+      }
+    }
+
+    const baseWhere = this.buildWhereClause(filters, 'ADMIN');
+    const where: Prisma.PropertyWhereInput = {
+      AND: [{ agentId }, baseWhere],
+    };
+
+    const [items, total] = await Promise.all([
+      this.prisma.property.findMany({
+        where,
+        include: {
+          city: true,
+          district: true,
+          features: { include: { feature: true } },
+          images: true,
+          visits3D: true,
+        },
+        skip,
+        take: limit,
+        orderBy,
+      }),
+      this.prisma.property.count({ where }),
+    ]);
+
+    return { page, total, totalPages: Math.ceil(total / limit), items };
+  }
+
 async update(id: number, dto: UpdatePropertyDto) {
-  const { images, features, assets3D, ...data } = dto;
+  const { images, features, assets3D, agentId: _agentId, ...data } = dto;
 
   const updateData: any = { ...data };
   if (dto.toilets !== undefined) {
@@ -172,6 +222,24 @@ async update(id: number, dto: UpdatePropertyDto) {
   });
 }
 
+  private async assertAgentOwnsProperty(propertyId: number, agentId: number) {
+    const prop = await this.prisma.property.findUnique({
+      where: { id: propertyId },
+      select: { id: true, agentId: true },
+    });
+    if (!prop) throw new NotFoundException(`Propriété avec ID ${propertyId} non trouvée.`);
+    if (!prop.agentId || prop.agentId !== agentId) {
+      throw new ForbiddenException("Vous ne pouvez modifier que les biens que vous avez créés.");
+    }
+  }
+
+  async updateForActor(id: number, dto: UpdatePropertyDto, actor: { id: number; role: string }) {
+    if (actor.role === 'AGENT') {
+      await this.assertAgentOwnsProperty(id, actor.id);
+    }
+    return this.update(id, dto);
+  }
+
   // -------------------------------------------------------------------
 
   // --- CREATE WITH IMAGES (Transaction) ---
@@ -179,7 +247,7 @@ async update(id: number, dto: UpdatePropertyDto) {
     dto: CreatePropertyDto,
     files: Express.Multer.File[],
   ) {
-    const { cityId, districtId, features, assets3D, title, images, ...data } = dto;
+    const { cityId, districtId, features, assets3D, title, images, agentId, ...data } = dto;
 
     const slug = slugify(title, { lower: true, strict: true, locale: 'fr' });
 
@@ -200,6 +268,7 @@ async update(id: number, dto: UpdatePropertyDto) {
           ...data,
           title,
           slug: finalSlug,
+          agent: agentId ? { connect: { id: agentId } } : undefined,
           city: cityId ? { connect: { id: cityId } } : undefined,
           district: districtId ? { connect: { id: districtId } } : undefined,
           features: features?.length
@@ -279,6 +348,13 @@ async update(id: number, dto: UpdatePropertyDto) {
       }
       throw error;
     }
+  }
+
+  async removeForActor(id: number, actor: { id: number; role: string }) {
+    if (actor.role === 'AGENT') {
+      await this.assertAgentOwnsProperty(id, actor.id);
+    }
+    return this.remove(id);
   }
 
   private buildWhereClause(filters: PropertyFilterDto, userRole?: string): Prisma.PropertyWhereInput {
