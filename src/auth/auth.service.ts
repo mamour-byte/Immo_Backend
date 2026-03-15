@@ -55,11 +55,13 @@ export class AuthService {
         fullName: true,
         phone: true,
         role: true,
+        isSuspended: true,
         createdAt: true,
       },
     });
 
     if (!user) throw new UnauthorizedException("Identifiants incorrects");
+    if (user.isSuspended) throw new UnauthorizedException("Compte suspendu");
 
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) throw new UnauthorizedException("Identifiants incorrects");

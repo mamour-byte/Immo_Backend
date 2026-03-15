@@ -63,6 +63,8 @@ model User {
   fullName     String?
   phone        String?
   role         Role     @default(USER)
+  isSuspended  Boolean  @default(false)
+  suspendedAt  DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
