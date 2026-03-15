@@ -123,6 +123,22 @@ async findOne(id: number, userRole?: string) {
       features: { include: { feature: true } },
       images: true,
       visits3D: true,  // <- ajout ici
+      agent: {
+        select: {
+          id: true,
+          email: true,
+          fullName: true,
+          phone: true,
+          agentProfile: {
+            select: {
+              companyName: true,
+              bio: true,
+              avatarUrl: true,
+              whatsapp: true,
+            },
+          },
+        },
+      },
     },
   });
   if (!item) throw new NotFoundException(`Propriété avec ID ${id} non trouvée.`);

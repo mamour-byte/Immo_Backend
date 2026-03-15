@@ -108,7 +108,12 @@ export class AuthService {
         },
       });
 
-      if (dto.companyName !== undefined || dto.bio !== undefined || dto.avatarUrl !== undefined) {
+      if (
+        dto.companyName !== undefined ||
+        dto.bio !== undefined ||
+        dto.avatarUrl !== undefined ||
+        dto.whatsapp !== undefined
+      ) {
         await tx.agentProfile.upsert({
           where: { userId },
           create: {
@@ -116,11 +121,13 @@ export class AuthService {
             companyName: dto.companyName,
             bio: dto.bio,
             avatarUrl: dto.avatarUrl,
+            whatsapp: dto.whatsapp,
           },
           update: {
             companyName: dto.companyName,
             bio: dto.bio,
             avatarUrl: dto.avatarUrl,
+            whatsapp: dto.whatsapp,
           },
         });
       }

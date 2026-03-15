@@ -82,6 +82,7 @@ export class AgentApplicationsService {
           companyName: dto.companyName,
           bio: dto.bio,
           avatarUrl: dto.avatarUrl,
+          whatsapp: dto.whatsapp,
           status: AgentApplicationStatus.PENDING,
         },
         select: {
@@ -138,6 +139,7 @@ export class AgentApplicationsService {
           companyName: dto.companyName,
           bio: dto.bio,
           avatarUrl: dto.avatarUrl,
+          whatsapp: dto.whatsapp,
           status: AgentApplicationStatus.PENDING,
         },
         select: { id: true, status: true, submittedAt: true },
@@ -196,6 +198,7 @@ export class AgentApplicationsService {
           companyName: dto.companyName,
           bio: dto.bio,
           avatarUrl: dto.avatarUrl,
+          whatsapp: dto.whatsapp,
         },
         include: {
           user: { select: { id: true, email: true, fullName: true, phone: true, role: true } },
@@ -251,7 +254,13 @@ export class AgentApplicationsService {
             companyName: app.companyName ?? undefined,
             bio: app.bio ?? undefined,
             avatarUrl: app.avatarUrl ?? undefined,
+            whatsapp: app.whatsapp ?? undefined,
           },
+        });
+      } else if (app.whatsapp) {
+        await tx.agentProfile.update({
+          where: { userId: app.user.id },
+          data: { whatsapp: app.whatsapp },
         });
       }
 

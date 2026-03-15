@@ -18,6 +18,10 @@ export class ApplyAgentDto {
 
   @IsOptional()
   @IsString()
+  whatsapp?: string;
+
+  @IsOptional()
+  @IsString()
   companyName?: string;
 
   @IsOptional()
@@ -28,4 +32,3 @@ export class ApplyAgentDto {
   @IsString()
   avatarUrl?: string;
 }
-
