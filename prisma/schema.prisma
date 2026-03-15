@@ -52,6 +52,12 @@ enum AgentApplicationStatus {
   REJECTED
 }
 
+enum AgentProfileType {
+  INDEPENDANT
+  AGENCY
+  DEVELOPER
+}
+
 /**
  * * MODELS **
  */
@@ -85,10 +91,46 @@ model AgentApplication {
   userId       Int                    @unique
   status       AgentApplicationStatus  @default(PENDING)
 
+  // Personal
+  firstName    String?
+  lastName     String?
+  city         String?
+  address      String?
+  profilePhotoUrl String?
+
+  // Account type
+  profileType  AgentProfileType?
+
   companyName  String?
   bio          String?
   avatarUrl    String?
   whatsapp     String?
+
+  // Professional
+  agencyName   String?
+  yearsExperience Int?
+  activityZone String?
+  managedPropertiesCount Int?
+  websiteUrl   String?
+  facebookUrl  String?
+
+  // Public contact
+  publicPhone  String?
+  languages    String[] @default([])
+  publicDescription String?
+
+  // Verification documents
+  idDocumentUrl String?
+  tradeRegisterUrl String?
+  professionalCardUrl String?
+
+  // Agency info (conditional)
+  agencyLogoUrl String?
+  agencyAddress String?
+  agencyPhotoUrl String?
+
+  acceptedTerms Boolean @default(false)
+  certifiedTrue Boolean @default(false)
 
   submittedAt  DateTime               @default(now())
   reviewedAt   DateTime?
@@ -109,6 +151,21 @@ model AgentProfile {
   bio         String?
   avatarUrl   String?
   whatsapp    String?
+  profileType AgentProfileType?
+  city        String?
+  address     String?
+  publicPhone String?
+  languages   String[] @default([])
+  publicDescription String?
+  websiteUrl  String?
+  facebookUrl String?
+  agencyName  String?
+  agencyLogoUrl String?
+  agencyAddress String?
+  agencyPhotoUrl String?
+  yearsExperience Int?
+  activityZone String?
+  managedPropertiesCount Int?
   user        User    @relation(fields: [userId], references: [id])
 }
 

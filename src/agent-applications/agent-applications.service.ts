@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -8,9 +9,10 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { ApplyAgentDto } from './dto/apply-agent.dto';
 import * as bcrypt from 'bcryptjs';
-import { AgentApplicationStatus, Role } from '@prisma/client';
+import { AgentApplicationStatus, AgentProfileType, Role } from '@prisma/client';
 import { UpdateAgentApplicationDto } from './dto/update-agent-application.dto';
 import { Resend } from 'resend';
+import { ApplyAgentFullDto } from './dto/apply-agent-full.dto';
 
 @Injectable()
 export class AgentApplicationsService {
@@ -54,6 +56,133 @@ export class AgentApplicationsService {
     } catch (error: any) {
       this.logger.error("Erreur lors de l'envoi de l'email de décision", error?.stack ?? error);
     }
+  }
+
+  private getUploadedUrl(file?: Express.Multer.File) {
+    if (!file) return undefined;
+    return ((file as any).path ?? (file as any).secure_url ?? file.filename) as string;
+  }
+
+  async applyFull(
+    dto: ApplyAgentFullDto,
+    files: {
+      profilePhoto?: Express.Multer.File[];
+      idDocument?: Express.Multer.File[];
+      tradeRegister?: Express.Multer.File[];
+      professionalCard?: Express.Multer.File[];
+      agencyLogo?: Express.Multer.File[];
+      agencyPhoto?: Express.Multer.File[];
+    },
+  ) {
+    if (!dto.acceptedTerms) throw new BadRequestException("Vous devez accepter les conditions d'utilisation.");
+    if (!dto.certifiedTrue) throw new BadRequestException("Vous devez certifier que les informations sont exactes.");
+    if (!Array.isArray(dto.languages) || dto.languages.length === 0) throw new BadRequestException("Langues parlées requises.");
+    if (dto.yearsExperience === undefined) throw new BadRequestException("Années d'expérience requises.");
+    if (!dto.activityZone?.trim()) throw new BadRequestException("Zone d'activité requise.");
+    if (dto.managedPropertiesCount === undefined) throw new BadRequestException("Nombre de biens gérés requis.");
+
+    const profilePhotoUrl = this.getUploadedUrl(files?.profilePhoto?.[0]);
+    const idDocumentUrl = this.getUploadedUrl(files?.idDocument?.[0]);
+    const tradeRegisterUrl = this.getUploadedUrl(files?.tradeRegister?.[0]);
+    const professionalCardUrl = this.getUploadedUrl(files?.professionalCard?.[0]);
+    const agencyLogoUrl = this.getUploadedUrl(files?.agencyLogo?.[0]);
+    const agencyPhotoUrl = this.getUploadedUrl(files?.agencyPhoto?.[0]);
+
+    if (!profilePhotoUrl) throw new BadRequestException('Photo de profil requise.');
+    if (!idDocumentUrl) throw new BadRequestException("Pièce d'identité requise.");
+
+    const isAgency = dto.profileType === AgentProfileType.AGENCY;
+    const needsOrgName = dto.profileType === AgentProfileType.AGENCY || dto.profileType === AgentProfileType.DEVELOPER;
+
+    if (needsOrgName && !dto.agencyName?.trim()) {
+      throw new BadRequestException("Nom de l'agence / société requis.");
+    }
+
+    if (isAgency) {
+      if (!tradeRegisterUrl) throw new BadRequestException('Registre de commerce requis pour une agence.');
+      if (!agencyLogoUrl) throw new BadRequestException("Logo de l'agence requis.");
+      if (!agencyPhotoUrl) throw new BadRequestException("Photo de l'agence requise.");
+    }
+
+    const exist = await this.prisma.user.findUnique({ where: { email: dto.email }, select: { id: true } });
+    if (exist) {
+      throw new ConflictException("Un utilisateur avec cet email existe déjà. Connectez-vous puis faites la demande.");
+    }
+
+    const passwordHash = await bcrypt.hash(dto.password, 10);
+    const fullName = `${dto.firstName} ${dto.lastName}`.trim();
+
+    const created = await this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          email: dto.email,
+          passwordHash,
+          fullName,
+          phone: dto.phone,
+          role: Role.USER,
+        },
+        select: { id: true, email: true },
+      });
+
+      const application = await tx.agentApplication.create({
+        data: {
+          userId: user.id,
+          status: AgentApplicationStatus.PENDING,
+
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+          city: dto.city,
+          address: dto.address,
+          profilePhotoUrl,
+          profileType: dto.profileType,
+
+          agencyName: dto.agencyName,
+          yearsExperience: dto.yearsExperience,
+          activityZone: dto.activityZone,
+          managedPropertiesCount: dto.managedPropertiesCount,
+          websiteUrl: dto.websiteUrl,
+          facebookUrl: dto.facebookUrl,
+
+          whatsapp: dto.whatsapp,
+          publicPhone: dto.publicPhone,
+          languages: dto.languages,
+          publicDescription: dto.publicDescription,
+
+          idDocumentUrl,
+          tradeRegisterUrl,
+          professionalCardUrl,
+
+          agencyLogoUrl,
+          agencyAddress: dto.address,
+          agencyPhotoUrl,
+
+          acceptedTerms: dto.acceptedTerms,
+          certifiedTrue: dto.certifiedTrue,
+
+          // Backward-compatible mirrors for existing UI
+          companyName: dto.agencyName,
+          bio: dto.publicDescription,
+          avatarUrl: profilePhotoUrl,
+        },
+        select: { id: true, status: true, submittedAt: true },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          actorId: user.id,
+          action: 'AGENT_APPLICATION_SUBMITTED',
+          meta: { applicationId: application.id },
+        },
+      });
+
+      return { user, application };
+    });
+
+    return {
+      success: true,
+      message: 'Demande envoyée. Un admin va étudier votre dossier.',
+      application: created.application,
+    };
   }
 
   async apply(dto: ApplyAgentDto) {

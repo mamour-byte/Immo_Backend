@@ -18,3 +18,12 @@ export const cloudinaryStorage = new CloudinaryStorage({
     transformation: [{ width: 1200, height: 800, crop: 'fill' }],
   } as unknown) as any,
 });
+
+export const agentApplicationsStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: ({
+    folder: 'agent-applications',
+    resource_type: 'auto',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'webp', 'pdf'],
+  } as unknown) as any,
+});
