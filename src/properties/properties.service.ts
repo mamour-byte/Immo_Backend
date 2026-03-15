@@ -92,17 +92,29 @@ export class PropertyService {
     const orderBy = this.buildOrderBy(sortBy, order);
 
     const where = this.buildWhereClause(filters, userRole);
+    const include: Prisma.PropertyInclude = {
+      city: true,
+      district: true,
+      features: { include: { feature: true } },
+      images: true,
+      visits3D: true,
+    };
+
+    if (userRole === 'ADMIN') {
+      include.agent = {
+        select: {
+          id: true,
+          email: true,
+          fullName: true,
+          phone: true,
+        },
+      };
+    }
 
     const [items, total] = await Promise.all([
       this.prisma.property.findMany({
         where,
-        include: {
-          city: true,
-          district: true,
-          features: { include: { feature: true } },
-          images: true,
-          visits3D: true,
-        },
+        include,
         skip,
         take: limit,
         orderBy,
