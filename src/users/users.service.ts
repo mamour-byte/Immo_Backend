@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import * as bcrypt from 'bcryptjs';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class UsersService {
@@ -37,7 +38,15 @@ export class UsersService {
         createdAt: true,
         updatedAt: true,
         agentProfile: true,
-        favorites: true,
+        agentApplication: true,
+        _count: {
+          select: {
+            favorites: true,
+            appointmentsAsUser: true,
+            appointmentsAsAgent: true,
+            properties: true,
+          },
+        },
       },
     });
 
@@ -104,8 +113,30 @@ export class UsersService {
     const user = await this.prisma.user.findUnique({ where: { id }, select: { id: true, role: true } });
     if (!user) throw new NotFoundException("Utilisateur introuvable");
     if (user.role === 'ADMIN') throw new ForbiddenException("Impossible de supprimer un admin");
-    return this.prisma.user.delete({
-      where: { id },
-    });
+
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        // Keep deletes safe across environments where FK rules may be RESTRICT.
+        await tx.favorite.deleteMany({ where: { userId: id } });
+        await tx.appointment.deleteMany({ where: { userId: id } });
+        await tx.agentProfile.deleteMany({ where: { userId: id } });
+        await tx.agentApplication.deleteMany({ where: { userId: id } });
+
+        // Defensive clean-up for optional agent relations.
+        await tx.property.updateMany({ where: { agentId: id }, data: { agentId: null } });
+        await tx.appointment.updateMany({ where: { agentId: id }, data: { agentId: null } });
+        await tx.message.updateMany({ where: { userId: id }, data: { userId: null } });
+        await tx.auditLog.updateMany({ where: { actorId: id }, data: { actorId: null } });
+
+        return tx.user.delete({ where: { id } });
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
+        throw new ConflictException(
+          "Suppression impossible: cet utilisateur est encore lie a des donnees dependantes.",
+        );
+      }
+      throw error;
+    }
   }
 }
