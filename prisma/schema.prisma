@@ -32,6 +32,11 @@ enum ListingPurpose {
   LOCATION
 }
 
+enum RentalMode {
+  MONTHLY
+  DAILY
+}
+
 enum PropertyStatus {
   AVAILABLE
   UNDER_OFFER
@@ -192,6 +197,7 @@ model Property {
   price       Int
   currency    String            @default("XOF")
   purpose     ListingPurpose
+  rentalMode  RentalMode?
   type        PropertyType
   status      PropertyStatus    @default(AVAILABLE)
   bedrooms    Int?

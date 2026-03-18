@@ -11,7 +11,7 @@ import {
   MinLength,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
-import { ListingPurpose, PropertyType, PropertyStatus } from '@prisma/client';
+import { ListingPurpose, PropertyType, PropertyStatus, RentalMode } from '@prisma/client';
 
 export class PropertyFilterDto {
   @IsOptional()
@@ -35,6 +35,10 @@ export class PropertyFilterDto {
   @IsOptional()
   @IsEnum(ListingPurpose)
   purpose?: ListingPurpose;
+
+  @IsOptional()
+  @IsEnum(RentalMode)
+  rentalMode?: RentalMode;
 
   @IsOptional()
   @IsEnum(PropertyStatus)

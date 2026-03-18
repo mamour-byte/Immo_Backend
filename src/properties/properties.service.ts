@@ -5,13 +5,21 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UpdatePropertyDto } from './dto/update-property.dto';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { PropertyFilterDto } from './dto/property-filter.dto';
-import { Prisma, PropertyStatus } from '@prisma/client';
+import { Prisma, PropertyStatus, ListingPurpose, RentalMode } from '@prisma/client';
 import { Express } from 'express';
 import slugify from 'slugify';
 
 @Injectable()
 export class PropertyService {
   constructor(private prisma: PrismaService) {}
+
+  private normalizeRentalMode(
+    purpose?: ListingPurpose | null,
+    rentalMode?: RentalMode | null,
+  ): RentalMode | null {
+    if (purpose !== ListingPurpose.LOCATION) return null;
+    return rentalMode ?? RentalMode.MONTHLY;
+  }
 
   private buildOrderBy(
     sortBy: string | undefined,
@@ -35,7 +43,7 @@ export class PropertyService {
 
   // property.service.ts (extraits)
   async create(dto: CreatePropertyDto) {
-  const { cityId, districtId, images, features, assets3D, title, agentId, ...data } = dto;
+  const { cityId, districtId, images, features, assets3D, title, agentId, rentalMode, ...data } = dto;
 
   const slug = slugify(title, { lower: true, strict: true, locale: 'fr' });
 
@@ -52,6 +60,7 @@ export class PropertyService {
     return this.prisma.property.create({
       data: {
         ...data,
+        rentalMode: this.normalizeRentalMode(data.purpose, rentalMode),
         title,
         slug: finalSlug,
         agent: agentId ? { connect: { id: agentId } } : undefined,
@@ -193,9 +202,24 @@ async findOne(id: number, userRole?: string) {
   }
 
 async update(id: number, dto: UpdatePropertyDto) {
-  const { images, features, assets3D, agentId: _agentId, ...data } = dto;
+  const { images, features, assets3D, agentId: _agentId, rentalMode, ...data } = dto;
 
   const updateData: any = { ...data };
+  let purposeForRental = dto.purpose as ListingPurpose | undefined;
+  if (purposeForRental === undefined && rentalMode !== undefined) {
+    const existing = await this.prisma.property.findUnique({
+      where: { id },
+      select: { purpose: true },
+    });
+    if (!existing) throw new NotFoundException(`Propriete avec ID ${id} non trouvee.`);
+    purposeForRental = existing.purpose;
+  }
+  if (dto.purpose !== undefined || rentalMode !== undefined) {
+    updateData.rentalMode = this.normalizeRentalMode(
+      purposeForRental ?? undefined,
+      (rentalMode as RentalMode | undefined) ?? undefined,
+    );
+  }
   if (dto.toilets !== undefined) {
     updateData.toilets = Number(dto.toilets);
   }
@@ -259,7 +283,7 @@ async update(id: number, dto: UpdatePropertyDto) {
     dto: CreatePropertyDto,
     files: Express.Multer.File[],
   ) {
-    const { cityId, districtId, features, assets3D, title, images, agentId, ...data } = dto;
+    const { cityId, districtId, features, assets3D, title, images, agentId, rentalMode, ...data } = dto;
 
     const slug = slugify(title, { lower: true, strict: true, locale: 'fr' });
 
@@ -278,6 +302,7 @@ async update(id: number, dto: UpdatePropertyDto) {
       const property = await tx.property.create({
         data: {
           ...data,
+          rentalMode: this.normalizeRentalMode(data.purpose, rentalMode),
           title,
           slug: finalSlug,
           agent: agentId ? { connect: { id: agentId } } : undefined,
@@ -415,7 +440,7 @@ async update(id: number, dto: UpdatePropertyDto) {
 
   private buildWhereClause(filters: PropertyFilterDto, userRole?: string): Prisma.PropertyWhereInput {
     const {
-      minPrice, maxPrice, type, purpose, status, cityId, districtId,
+      minPrice, maxPrice, type, purpose, rentalMode, status, cityId, districtId,
       bedrooms, bathrooms, minSurface, maxSurface, features, search,
     } = filters;
 
@@ -430,6 +455,7 @@ async update(id: number, dto: UpdatePropertyDto) {
 
     if (type) where.type = type;
     if (purpose) where.purpose = purpose;
+    if (rentalMode) where.rentalMode = rentalMode;
 
     const isAdmin = userRole === 'ADMIN';
 

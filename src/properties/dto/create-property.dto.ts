@@ -1,11 +1,12 @@
 import { IsString, IsInt, IsOptional, IsEnum, IsNumber, IsArray, IsBoolean, Min } from 'class-validator';
-import { ListingPurpose, PropertyType, Furnishing, PropertyStatus } from '@prisma/client';
+import { ListingPurpose, PropertyType, Furnishing, PropertyStatus, RentalMode } from '@prisma/client';
 
 export class CreatePropertyDto {
   @IsString() title!: string;
   @IsString() description!: string;
   @IsInt() @Min(0) price!: number;
   @IsEnum(ListingPurpose) purpose!: ListingPurpose;
+  @IsOptional() @IsEnum(RentalMode) rentalMode?: RentalMode;
   @IsEnum(PropertyType) type!: PropertyType;
 
   @IsOptional()
