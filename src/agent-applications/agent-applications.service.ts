@@ -13,13 +13,17 @@ import { AgentApplicationStatus, AgentProfileType, Role } from '@prisma/client';
 import { UpdateAgentApplicationDto } from './dto/update-agent-application.dto';
 import { Resend } from 'resend';
 import { ApplyAgentFullDto } from './dto/apply-agent-full.dto';
+import { AnalyticsService } from '../analytics/analytics.service';
 
 @Injectable()
 export class AgentApplicationsService {
   private readonly logger = new Logger(AgentApplicationsService.name);
   private resend: Resend;
 
-  constructor(private prisma: PrismaService) {
+  constructor(
+    private prisma: PrismaService,
+    private analytics: AnalyticsService,
+  ) {
     const apiKey = process.env.RESEND_API_KEY;
     if (!apiKey) {
       this.logger.warn("RESEND_API_KEY n'est pas défini. Les emails ne seront pas envoyés.");
@@ -27,23 +31,42 @@ export class AgentApplicationsService {
     this.resend = new Resend(apiKey);
   }
 
+  private buildDecisionMessage(args: {
+    status: AgentApplicationStatus;
+    decisionNote?: string | null;
+  }) {
+    const notePart = args.decisionNote ? `\n\nMessage complementaire:\n${args.decisionNote}` : '';
+
+    if (args.status === AgentApplicationStatus.APPROVED) {
+      return `Bonjour,\n\nVotre demande de compte agent a ete acceptee. Vous pouvez maintenant vous connecter a votre espace agent.${notePart}\n\nCordialement,\nEthic Immobilier`;
+    }
+
+    return `Bonjour,\n\nVotre demande de compte agent a ete refusee.${notePart}\n\nVous pouvez nous contacter pour plus d'informations.\n\nCordialement,\nEthic Immobilier`;
+  }
+
+  private normalizePhoneForWhatsApp(phone?: string | null) {
+    if (!phone) return null;
+    const digits = String(phone).replace(/[^\d]/g, '');
+    return digits || null;
+  }
+
   private async sendDecisionEmail(args: {
     to: string;
     status: AgentApplicationStatus;
     decisionNote?: string | null;
   }) {
+    if (!process.env.RESEND_API_KEY) return;
+
     const from = process.env.MAIL_FROM || 'Ethic Immobilier <onboarding@resend.dev>';
     const subject =
       args.status === AgentApplicationStatus.APPROVED
-        ? 'Votre demande de compte agent a été acceptée'
-        : 'Votre demande de compte agent a été refusée';
+        ? 'Votre demande de compte agent a ete acceptee'
+        : 'Votre demande de compte agent a ete refusee';
 
-    const notePart = args.decisionNote ? `\n\nMessage de l'admin :\n${args.decisionNote}` : '';
-
-    const text =
-      args.status === AgentApplicationStatus.APPROVED
-        ? `Bonjour,\n\nVotre demande de compte agent a été acceptée. Vous pouvez maintenant vous connecter et accéder au tableau de bord.${notePart}\n\nCordialement,\nEthic Immobilier`
-        : `Bonjour,\n\nVotre demande de compte agent a été refusée.${notePart}\n\nSi vous pensez qu'il s'agit d'une erreur, vous pouvez répondre à cet email.\n\nCordialement,\nEthic Immobilier`;
+    const text = this.buildDecisionMessage({
+      status: args.status,
+      decisionNote: args.decisionNote,
+    });
 
     try {
       const response = await this.resend.emails.send({
@@ -54,7 +77,56 @@ export class AgentApplicationsService {
       });
       this.logger.log(`Decision email sent: ${JSON.stringify(response)}`);
     } catch (error: any) {
-      this.logger.error("Erreur lors de l'envoi de l'email de décision", error?.stack ?? error);
+      this.logger.error("Erreur lors de l'envoi de l'email de decision", error?.stack ?? error);
+    }
+  }
+
+  private async sendDecisionWhatsApp(args: {
+    to?: string | null;
+    status: AgentApplicationStatus;
+    decisionNote?: string | null;
+  }) {
+    const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+    const apiVersion = process.env.WHATSAPP_API_VERSION || 'v22.0';
+    const to = this.normalizePhoneForWhatsApp(args.to);
+
+    if (!to) return;
+    if (!accessToken || !phoneNumberId) {
+      this.logger.warn('WhatsApp non configure. Definissez WHATSAPP_ACCESS_TOKEN et WHATSAPP_PHONE_NUMBER_ID.');
+      return;
+    }
+
+    const text = this.buildDecisionMessage({
+      status: args.status,
+      decisionNote: args.decisionNote,
+    });
+
+    try {
+      const resp = await fetch(`https://graph.facebook.com/${apiVersion}/${phoneNumberId}/messages`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to,
+          type: 'text',
+          text: { preview_url: false, body: text },
+        }),
+      });
+
+      if (!resp.ok) {
+        const data = await resp.json().catch(() => ({}));
+        this.logger.error(`Erreur envoi WhatsApp: ${resp.status} ${JSON.stringify(data)}`);
+        return;
+      }
+
+      this.logger.log(`Decision WhatsApp sent to ${to}`);
+    } catch (error: any) {
+      this.logger.error("Erreur lors de l'envoi du message WhatsApp", error?.stack ?? error);
     }
   }
 
@@ -178,6 +250,16 @@ export class AgentApplicationsService {
       return { user, application };
     });
 
+    this.analytics.capture({
+      distinctId: `user:${created.user.id}`,
+      event: 'agent_application_submitted',
+      properties: {
+        application_id: created.application.id,
+        profile_type: dto.profileType,
+        source: 'public_form_full',
+      },
+    });
+
     return {
       success: true,
       message: 'Demande envoyée. Un admin va étudier votre dossier.',
@@ -232,6 +314,15 @@ export class AgentApplicationsService {
       return { user, application };
     });
 
+    this.analytics.capture({
+      distinctId: `user:${created.user.id}`,
+      event: 'agent_application_submitted',
+      properties: {
+        application_id: created.application.id,
+        source: 'public_form_basic',
+      },
+    });
+
     return {
       success: true,
       message: 'Demande envoyée. Un admin va étudier votre dossier.',
@@ -283,6 +374,15 @@ export class AgentApplicationsService {
       });
 
       return app;
+    });
+
+    this.analytics.capture({
+      distinctId: `user:${userId}`,
+      event: 'agent_application_submitted',
+      properties: {
+        application_id: application.id,
+        source: 'existing_account',
+      },
     });
 
     return {
@@ -352,11 +452,11 @@ export class AgentApplicationsService {
     const updated = await this.prisma.$transaction(async (tx) => {
       const app = await tx.agentApplication.findUnique({
         where: { id: applicationId },
-        include: { user: { select: { id: true, email: true, role: true } } },
+        include: { user: { select: { id: true, email: true, phone: true, role: true } } },
       });
       if (!app) throw new NotFoundException('Demande introuvable');
       if (app.status !== AgentApplicationStatus.PENDING) {
-        throw new BadRequestException('Demande déjà traitée');
+        throw new BadRequestException('Demande deja traitee');
       }
 
       const result = await tx.agentApplication.update({
@@ -401,27 +501,51 @@ export class AgentApplicationsService {
         },
       });
 
-      return result;
+      return {
+        result,
+        contact: {
+          email: app.user.email,
+          whatsapp: app.whatsapp,
+          phone: app.user.phone,
+        },
+      };
     });
 
-    await this.sendDecisionEmail({
-      to: updated.user.email,
-      status: AgentApplicationStatus.APPROVED,
-      decisionNote,
+    await Promise.all([
+      this.sendDecisionEmail({
+        to: updated.contact.email,
+        status: AgentApplicationStatus.APPROVED,
+        decisionNote,
+      }),
+      this.sendDecisionWhatsApp({
+        to: updated.contact.whatsapp || updated.contact.phone,
+        status: AgentApplicationStatus.APPROVED,
+        decisionNote,
+      }),
+    ]);
+
+    this.analytics.capture({
+      distinctId: `user:${updated.result.user.id}`,
+      event: 'agent_application_reviewed',
+      properties: {
+        application_id: updated.result.id,
+        status: AgentApplicationStatus.APPROVED,
+        reviewer_id: adminId,
+      },
     });
 
-    return updated;
+    return updated.result;
   }
 
   async reject(applicationId: number, adminId: number, decisionNote?: string) {
     const updated = await this.prisma.$transaction(async (tx) => {
       const app = await tx.agentApplication.findUnique({
         where: { id: applicationId },
-        include: { user: { select: { id: true, email: true } } },
+        include: { user: { select: { id: true, email: true, phone: true } } },
       });
       if (!app) throw new NotFoundException('Demande introuvable');
       if (app.status !== AgentApplicationStatus.PENDING) {
-        throw new BadRequestException('Demande déjà traitée');
+        throw new BadRequestException('Demande deja traitee');
       }
 
       const result = await tx.agentApplication.update({
@@ -443,15 +567,39 @@ export class AgentApplicationsService {
         },
       });
 
-      return result;
+      return {
+        result,
+        contact: {
+          email: app.user.email,
+          whatsapp: app.whatsapp,
+          phone: app.user.phone,
+        },
+      };
     });
 
-    await this.sendDecisionEmail({
-      to: updated.user.email,
-      status: AgentApplicationStatus.REJECTED,
-      decisionNote,
+    await Promise.all([
+      this.sendDecisionEmail({
+        to: updated.contact.email,
+        status: AgentApplicationStatus.REJECTED,
+        decisionNote,
+      }),
+      this.sendDecisionWhatsApp({
+        to: updated.contact.whatsapp || updated.contact.phone,
+        status: AgentApplicationStatus.REJECTED,
+        decisionNote,
+      }),
+    ]);
+
+    this.analytics.capture({
+      distinctId: `user:${updated.result.user.id}`,
+      event: 'agent_application_reviewed',
+      properties: {
+        application_id: updated.result.id,
+        status: AgentApplicationStatus.REJECTED,
+        reviewer_id: adminId,
+      },
     });
 
-    return updated;
+    return updated.result;
   }
 }

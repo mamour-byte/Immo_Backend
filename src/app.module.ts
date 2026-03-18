@@ -16,10 +16,19 @@ import { CitiesModule } from './cities/cities.module';
 import { DistrictsModule } from './districts/districts.module';
 import { ContactModule } from './contact/contact.module';
 import { AgentApplicationsModule } from './agent-applications/agent-applications.module';
+import { AnalyticsModule } from './analytics/analytics.module';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { AnalyticsHttpInterceptor } from './analytics/analytics-http.interceptor';
 
 @Module({
-  imports: [PrismaModule, UsersModule, AuthModule, AgentsModule, AgentApplicationsModule, PropertiesModule, PropertyImageModule, FeaturesModule, AppointmentsModule, FavoritesModule, Asset3DModule, MessagesModule, CitiesModule, DistrictsModule, ContactModule],
+  imports: [AnalyticsModule, PrismaModule, UsersModule, AuthModule, AgentsModule, AgentApplicationsModule, PropertiesModule, PropertyImageModule, FeaturesModule, AppointmentsModule, FavoritesModule, Asset3DModule, MessagesModule, CitiesModule, DistrictsModule, ContactModule],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: AnalyticsHttpInterceptor,
+    },
+  ],
 })
 export class AppModule {}
