@@ -87,8 +87,23 @@ model User {
   agentProfile        AgentProfile?
   agentApplication    AgentApplication?
   reviewedApplications AgentApplication[] @relation("ReviewedApplications")
+  passwordResetTokens PasswordResetToken[]
 
   auditLogs AuditLog[]
+}
+
+model PasswordResetToken {
+  id        Int      @id @default(autoincrement())
+  tokenHash String   @unique
+  userId    Int
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model AgentApplication {
