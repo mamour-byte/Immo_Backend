@@ -51,10 +51,18 @@ export class PropertyFilterDto {
   cityId?: number;
 
   @IsOptional()
-  @Transform(({ value }) => value ? Number(value) : undefined)
-  @Type(() => Number)
-  @IsInt()
-  districtId?: number;
+  @Transform(({ value }) => {
+    if (Array.isArray(value)) {
+      return value.map(v => Number(v)).filter(n => !Number.isNaN(n));
+    }
+    if (typeof value === 'string') {
+      return value.split(',').map(v => Number(v.trim())).filter(n => !Number.isNaN(n));
+    }
+    return value ? [Number(value)] : undefined;
+  })
+  @IsArray()
+  @IsInt({ each: true })
+  districtIds?: number[];
 
   @IsOptional()
   @Transform(({ value }) => value ? Number(value) : undefined)

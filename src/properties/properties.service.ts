@@ -440,7 +440,7 @@ async update(id: number, dto: UpdatePropertyDto) {
 
   private buildWhereClause(filters: PropertyFilterDto, userRole?: string): Prisma.PropertyWhereInput {
     const {
-      minPrice, maxPrice, type, purpose, rentalMode, status, cityId, districtId,
+      minPrice, maxPrice, type, purpose, rentalMode, status, cityId, districtIds,
       bedrooms, bathrooms, minSurface, maxSurface, features, search,
     } = filters;
 
@@ -479,7 +479,9 @@ async update(id: number, dto: UpdatePropertyDto) {
     }
 
     if (cityId) where.cityId = typeof cityId === 'string' ? Number(cityId) : cityId;
-    if (districtId) where.districtId = typeof districtId === 'string' ? Number(districtId) : districtId;
+    if (filters.districtIds && filters.districtIds.length > 0) {
+      where.districtId = { in: filters.districtIds };
+    }
 
     // Utiliser gte (greater than or equal) pour "au moins X" chambres/salles de bains
     if (bedrooms) {
