@@ -80,6 +80,7 @@ export class PropertyService {
           ? { create: assets3D.map((asset) => ({
               provider: asset.provider,
               assetUrl: asset.assetUrl,
+              fileUrl: asset.fileUrl,
               title: asset.title,
               thumbnail: asset.thumbnail
             })) }
@@ -240,6 +241,7 @@ async update(id: number, dto: UpdatePropertyDto) {
     updateData.visits3D = { deleteMany: {}, create: assets3D.map((asset) => ({
       provider: asset.provider,
       assetUrl: asset.assetUrl,
+      fileUrl: asset.fileUrl,
       title: asset.title,
       thumbnail: asset.thumbnail,
     })) };

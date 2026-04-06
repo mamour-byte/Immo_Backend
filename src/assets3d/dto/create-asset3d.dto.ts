@@ -5,7 +5,8 @@ export class CreateAsset3DDto {
   @IsInt() propertyId!: number;
   @IsOptional() @IsString() title?: string;
   @IsString() provider!: string;
-  @IsString() assetUrl!: string;
+  @IsOptional() @IsString() assetUrl?: string;
+  @IsOptional() @IsString() fileUrl?: string;
   @IsOptional() @IsString() thumbnail?: string;
 }
 

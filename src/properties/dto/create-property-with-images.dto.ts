@@ -72,7 +72,8 @@ export class CreatePropertyWithImagesDto {
 
 export class Asset3DDto {
   @IsString() provider!: string;
-  @IsString() assetUrl!: string;
+  @IsOptional() @IsString() assetUrl?: string;
+  @IsOptional() @IsString() fileUrl?: string;
   @IsOptional() @IsString() title?: string;
   @IsOptional() @IsString() thumbnail?: string;
 }

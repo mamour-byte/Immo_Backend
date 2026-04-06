@@ -312,7 +312,8 @@ model Asset3D {
   propertyId Int
   title      String?
   provider   String
-  assetUrl   String
+  assetUrl   String?
+  fileUrl    String?
   thumbnail  String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt

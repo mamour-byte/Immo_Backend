@@ -78,6 +78,12 @@
 //             provider: 'sketchfab',
 //             assetUrl: 'https://sketchfab.com/3d-models/kitchen-living-room-abc123',
 //             thumbnail: 'https://picsum.photos/400/300?random=3d2'
+//           },
+//           {
+//             title: 'Modèle 3D GLB',
+//             provider: 'glb',
+//             fileUrl: 'https://example.com/models/apartment.glb',
+//             thumbnail: 'https://picsum.photos/400/300?random=3d3'
 //           }
 //         ]
 //       }

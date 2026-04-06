@@ -27,3 +27,12 @@ export const agentApplicationsStorage = new CloudinaryStorage({
     allowed_formats: ['jpg', 'jpeg', 'png', 'webp', 'pdf'],
   } as unknown) as any,
 });
+
+export const asset3DStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: ({
+    folder: 'assets3d',
+    resource_type: 'auto',
+    allowed_formats: ['glb', 'gltf', 'obj', 'fbx', 'dae'],
+  } as unknown) as any,
+});
