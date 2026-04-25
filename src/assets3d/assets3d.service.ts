@@ -3,7 +3,6 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateAsset3DDto } from './dto/create-asset3d.dto';
 import { UpdateAsset3DDto } from './dto/update-asset3d.dto';
 import { optimizeGLB, generateThumbnail } from '../utils/glb-optimizer';
-import * as path from 'path';
 
 @Injectable()
 export class Asset3DService {

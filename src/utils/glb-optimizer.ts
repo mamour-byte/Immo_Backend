@@ -1,11 +1,11 @@
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
 
 /**
  * Optimisation simple de fichiers GLB
  * Réduit la taille en supprimant les données non essentielles
  */
-function optimizeGLB(inputPath, outputPath) {
+export function optimizeGLB(inputPath: string, outputPath: string): Promise<void> {
   return new Promise((resolve, reject) => {
     // Pour une vraie optimisation, utiliser gltf-pipeline ou similar
     // Ici on fait juste une copie avec vérification de base
@@ -22,7 +22,7 @@ function optimizeGLB(inputPath, outputPath) {
     // Copie simple (dans un vrai projet, utiliser une vraie optimisation GLB)
     fs.copyFile(inputPath, outputPath, (err) => {
       if (err) reject(err);
-      else resolve(outputPath);
+      else resolve();
     });
   });
 }
@@ -31,7 +31,7 @@ function optimizeGLB(inputPath, outputPath) {
  * Génération de miniature depuis un fichier GLB
  * Utilise une approche simplifiée
  */
-function generateThumbnail(glbPath, thumbnailPath) {
+export function generateThumbnail(glbPath: string, thumbnailPath: string): Promise<void> {
   return new Promise((resolve, reject) => {
     // Dans un vrai projet, utiliser three.js côté serveur ou un service externe
     // Ici on crée juste une miniature placeholder
@@ -51,9 +51,7 @@ function generateThumbnail(glbPath, thumbnailPath) {
 
     fs.writeFile(thumbnailPath, placeholderSvg, (err) => {
       if (err) reject(err);
-      else resolve(thumbnailPath);
+      else resolve();
     });
   });
 }
-
-module.exports = { optimizeGLB, generateThumbnail };
