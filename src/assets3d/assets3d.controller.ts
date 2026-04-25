@@ -9,7 +9,7 @@ import { asset3DStorage } from '../cloudinary/cloudinary-storage';
 export class Asset3DController {
   constructor(private readonly asset3DService: Asset3DService) {}
 
-  private static readonly MAX_3D_FILE_BYTES = 50 * 1024 * 1024; // 50MB for 3D files
+  private static readonly MAX_3D_FILE_BYTES = 10 * 1024 * 1024; // 10MB max pour fichiers 3D (réduit)
 
   private static readonly asset3DUploadMulterOptions = {
     storage: asset3DStorage,

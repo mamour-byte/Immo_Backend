@@ -27,6 +27,9 @@ export class PropertyService {
   ): Prisma.PropertyOrderByWithRelationInput {
     const direction = order ?? 'desc';
 
+    // Whitelist of allowed sort fields to prevent column errors
+    const allowedSortFields = ['createdAt', 'price', 'surfaceM2', 'bedrooms', 'bathrooms', 'toilets', 'floor', 'rooms'];
+
     switch (sortBy) {
       case 'recent':
         return { createdAt: direction };
@@ -37,6 +40,10 @@ export class PropertyService {
       case 'surface':
         return { surfaceM2: direction };
       default:
+        // For unknown sortBy or if sortBy is in allowed fields, use it safely
+        if (sortBy && allowedSortFields.includes(sortBy)) {
+          return { [sortBy]: direction };
+        }
         return { createdAt: 'desc' };
     }
   }
