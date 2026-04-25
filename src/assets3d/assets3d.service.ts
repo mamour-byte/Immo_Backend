@@ -28,16 +28,12 @@ export class Asset3DService {
         dto.thumbnail = thumbnailPath.replace(/\\/g, '/'); // Normaliser pour le web
 
       } catch (error) {
-        console.warn('Erreur optimisation GLB:', error.message);
+        const err = error as Error;
+        console.warn('Erreur optimisation GLB:', err.message);
         // Continuer sans optimisation si ça échoue
       }
     }
 
-    return this.prisma.asset3D.create({
-      data: dto,
-      include: { property: true },
-    });
-  }
     return this.prisma.asset3D.create({
       data: dto,
       include: { property: true },
