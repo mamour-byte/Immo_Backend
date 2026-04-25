@@ -1,5 +1,7 @@
+import { Transform } from 'class-transformer';
 import { IsString, IsInt, IsOptional, IsEnum, IsNumber, IsArray, IsBoolean, Min } from 'class-validator';
 import { ListingPurpose, PropertyType, Furnishing, PropertyStatus, RentalMode } from '@prisma/client';
+import { toNumberArray, toObjectArray, toStringArray } from './array-transformers';
 
 export class CreatePropertyDto {
   @IsString() title!: string;
@@ -27,10 +29,20 @@ export class CreatePropertyDto {
   @IsOptional() @IsNumber() longitude?: number;
   @IsOptional() @IsBoolean() isFeatured?: boolean;
 
-  @IsOptional() @IsArray() features?: number[]; // IDs des features
-  @IsOptional() @IsArray() images?: string[]; // URLs des images
+  @IsOptional()
+  @Transform(({ value }) => toNumberArray(value))
+  @IsArray()
+  features?: number[]; // IDs des features
 
-  @IsOptional() @IsArray() assets3D?: Asset3DDto[];
+  @IsOptional()
+  @Transform(({ value }) => toStringArray(value))
+  @IsArray()
+  images?: string[]; // URLs des images
+
+  @IsOptional()
+  @Transform(({ value }) => toObjectArray<Asset3DDto>(value))
+  @IsArray()
+  assets3D?: Asset3DDto[];
 
   @IsOptional()
   @IsInt()

@@ -320,6 +320,15 @@ async update(id: number, dto: UpdatePropertyDto) {
           features: features?.length
             ? { create: features.map((featureId) => ({ feature: { connect: { id: featureId } } })) }
             : undefined,
+          images: images?.length
+            ? {
+                create: images.map((url, index) => ({
+                  url,
+                  order: index,
+                  provider: 'external',
+                })),
+              }
+            : undefined,
           visits3D: assets3D?.length
             ? { create: assets3D.map((asset) => ({
                 provider: asset.provider,
@@ -346,7 +355,7 @@ async update(id: number, dto: UpdatePropertyDto) {
               data: {
                 url: (file as any).path ?? (file as any).secure_url ?? file.filename,
                 propertyId: property.id,
-                order: index,
+                order: (images?.length ?? 0) + index,
                 provider: 'cloudinary',
               },
             }),
