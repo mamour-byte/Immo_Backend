@@ -8,10 +8,42 @@ import { PropertyFilterDto } from './dto/property-filter.dto';
 import { Prisma, PropertyStatus, ListingPurpose, RentalMode } from '@prisma/client';
 import { Express } from 'express';
 import slugify from 'slugify';
+import { DEFAULT_FEATURE_NAMES } from '../features/default-features';
 
 @Injectable()
 export class PropertyService {
   constructor(private prisma: PrismaService) {}
+
+  private async ensureDefaultFeaturesIfEmpty() {
+    const count = await this.prisma.feature.count();
+    if (count > 0) return;
+
+    await this.prisma.feature.createMany({
+      data: DEFAULT_FEATURE_NAMES.map((name) => ({ name })),
+      skipDuplicates: true,
+    });
+  }
+
+  private async resolveExistingFeatureIds(featureIds?: number[]): Promise<number[]> {
+    if (!featureIds?.length) return [];
+
+    await this.ensureDefaultFeaturesIfEmpty();
+
+    const uniqueIds = [...new Set(
+      featureIds
+        .map((featureId) => Number(featureId))
+        .filter((featureId) => Number.isInteger(featureId) && featureId > 0),
+    )];
+
+    if (!uniqueIds.length) return [];
+
+    const existingFeatures = await this.prisma.feature.findMany({
+      where: { id: { in: uniqueIds } },
+      select: { id: true },
+    });
+
+    return existingFeatures.map((feature) => feature.id);
+  }
 
   private normalizeRentalMode(
     purpose?: ListingPurpose | null,
@@ -51,6 +83,7 @@ export class PropertyService {
   // property.service.ts (extraits)
   async create(dto: CreatePropertyDto) {
   const { cityId, districtId, images, features, assets3D, title, agentId, rentalMode, ...data } = dto;
+  const validFeatureIds = await this.resolveExistingFeatureIds(features);
 
   const slug = slugify(title, { lower: true, strict: true, locale: 'fr' });
 
@@ -75,8 +108,8 @@ export class PropertyService {
         district: districtId ? { connect: { id: districtId } } : undefined,
         toilets: dto.toilets !== undefined ? Number(dto.toilets) : undefined,
 
-        features: features?.length
-          ? { create: features.map((featureId) => ({ feature: { connect: { id: featureId } } })) }
+        features: validFeatureIds.length
+          ? { create: validFeatureIds.map((featureId) => ({ feature: { connect: { id: featureId } } })) }
           : undefined,
 
         images: images?.length
@@ -211,6 +244,9 @@ async findOne(id: number, userRole?: string) {
 
 async update(id: number, dto: UpdatePropertyDto) {
   const { images, features, assets3D, agentId: _agentId, rentalMode, ...data } = dto;
+  const validFeatureIds = features !== undefined
+    ? await this.resolveExistingFeatureIds(features)
+    : undefined;
 
   const updateData: any = { ...data };
   let purposeForRental = dto.purpose as ListingPurpose | undefined;
@@ -233,10 +269,14 @@ async update(id: number, dto: UpdatePropertyDto) {
   }
 
   if (features !== undefined) {
-    updateData.features = {
-      deleteMany: {},
-      create: features.map((featureId) => ({ feature: { connect: { id: featureId } } })),
-    };
+    if (features.length === 0) {
+      updateData.features = { deleteMany: {} };
+    } else if (validFeatureIds && validFeatureIds.length > 0) {
+      updateData.features = {
+        deleteMany: {},
+        create: validFeatureIds.map((featureId) => ({ feature: { connect: { id: featureId } } })),
+      };
+    }
   }
 
   if (images !== undefined) {
@@ -293,6 +333,7 @@ async update(id: number, dto: UpdatePropertyDto) {
     files: Express.Multer.File[],
   ) {
     const { cityId, districtId, features, assets3D, title, images, agentId, rentalMode, ...data } = dto;
+    const validFeatureIds = await this.resolveExistingFeatureIds(features);
 
     const slug = slugify(title, { lower: true, strict: true, locale: 'fr' });
 
@@ -317,8 +358,8 @@ async update(id: number, dto: UpdatePropertyDto) {
           agent: agentId ? { connect: { id: agentId } } : undefined,
           city: cityId ? { connect: { id: cityId } } : undefined,
           district: districtId ? { connect: { id: districtId } } : undefined,
-          features: features?.length
-            ? { create: features.map((featureId) => ({ feature: { connect: { id: featureId } } })) }
+          features: validFeatureIds.length
+            ? { create: validFeatureIds.map((featureId) => ({ feature: { connect: { id: featureId } } })) }
             : undefined,
           images: images?.length
             ? {

@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import { DEFAULT_FEATURE_NAMES } from '../src/features/default-features';
 
 const prisma = new PrismaClient();
 
@@ -85,9 +86,23 @@ async function main() {
     }
   }
 
+  for (const featureName of DEFAULT_FEATURE_NAMES) {
+    try {
+      const feature = await prisma.feature.upsert({
+        where: { name: featureName },
+        update: {},
+        create: { name: featureName },
+      });
+      console.log(`✅ Feature ready: ${feature.name}`);
+    } catch (error: any) {
+      console.log(`⚠️  Error with feature ${featureName}:`, error.message);
+    }
+  }
+
   console.log('\n✅ Database seeded successfully!');
   console.log('🎯 Admin account: mamourf958@gmail.com / Papou@2212');
   console.log('🌍 Cities created: Dakar, Thiès, Mbour with their districts');
+  console.log(`🏷️  Features created: ${DEFAULT_FEATURE_NAMES.join(', ')}`);
 }
 
 main()

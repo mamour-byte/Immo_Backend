@@ -2,10 +2,21 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateFeatureDto } from './dto/create-feature.dto';
 import { UpdateFeatureDto } from './dto/update-feature.dto';
+import { DEFAULT_FEATURE_NAMES } from './default-features';
 
 @Injectable()
 export class FeaturesService {
   constructor(private prisma: PrismaService) {}
+
+  private async ensureDefaultsIfEmpty() {
+    const count = await this.prisma.feature.count();
+    if (count > 0) return;
+
+    await this.prisma.feature.createMany({
+      data: DEFAULT_FEATURE_NAMES.map((name) => ({ name })),
+      skipDuplicates: true,
+    });
+  }
 
   async create(dto: CreateFeatureDto) {
     return this.prisma.feature.create({
@@ -14,7 +25,8 @@ export class FeaturesService {
   }
 
   async findAll() {
-    return this.prisma.feature.findMany();
+    await this.ensureDefaultsIfEmpty();
+    return this.prisma.feature.findMany({ orderBy: { id: 'asc' } });
   }
 
   async findOne(id: number) {
