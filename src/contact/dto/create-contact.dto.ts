@@ -19,6 +19,10 @@ export class CreateContactDto {
     message!: string;
 
   @IsOptional()
+  @IsString()
+  channel?: string;
+
+  @IsOptional()
   @Transform(({ value }) => value ? Number(value) : undefined)
   @Type(() => Number)
   @IsInt()
